@@ -28,7 +28,13 @@ jobs:
           base64 -d /tmp/app.tar.gz.b64 > /tmp/app.tar.gz
           tar -xzf /tmp/app.tar.gz -C .
           if [ -f final2/docx-fix.patch ]; then git apply final2/docx-fix.patch; fi
-          if [ -f lint-fix.patch ]; then git apply lint-fix.patch; fi
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/DashboardClient.tsx')
+          s = p.read_text()
+          s = s.replace("Today's new jobs", "Today&apos;s new jobs")
+          p.write_text(s)
+          PY
           rm -rf final final2
           rm -f lint-fix.patch
       - uses: actions/setup-node@v4
