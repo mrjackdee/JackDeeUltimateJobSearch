@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
+// Vercel Analytics tracks page views across the app.
+import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import './ux.css';
 import { Header } from '@/components/Header';
@@ -29,6 +31,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <main className="main">{children}</main>
           <div className="mobile-nav"><Nav/></div>
         </div>
+        <Analytics />
       </body>
     </html>
   );
