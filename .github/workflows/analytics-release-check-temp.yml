@@ -1,0 +1,32 @@
+name: Analytics Release Check
+on:
+  push:
+    branches: ['feature/vercel-analytics']
+permissions:
+  contents: write
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/vercel-analytics
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install exact project packages
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Check code
+        run: npm run typecheck
+      - name: Build site
+        run: npm run build
+      - name: Remove temporary check file
+        if: success()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/analytics-release-check-temp.yml
+          git commit -m 'chore: remove analytics release check workflow'
+          git push origin HEAD:feature/vercel-analytics
