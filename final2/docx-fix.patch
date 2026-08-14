@@ -1,0 +1,20 @@
+--- a/src/lib/documents/docx.ts
++++ b/src/lib/documents/docx.ts
+@@ -67,7 +67,7 @@
+   const doc = new Document({
+     styles: {
+       default: { document: { run: { font: FONT, size: BODY, color: TEXT }, paragraph: { spacing: { line: LINE } } } },
+-      paragraphStyles: [{ id: 'Normal', name: 'Normal', basedOn: 'Normal', next: 'Normal', quickFormat: true, run: { font: FONT, size: BODY, color: TEXT }, paragraph: { spacing: { line: LINE, after: 72 }, widowControl: true } }],
++      paragraphStyles: [{ id: 'Normal', name: 'Normal', basedOn: 'Normal', next: 'Normal', quickFormat: true, run: { font: FONT, size: BODY, color: TEXT }, paragraph: { spacing: { line: LINE, after: 72 } } }],
+     },
+     sections: [{ properties: { page: { margin: { top: 540, right: 650, bottom: 540, left: 650 } } }, children }],
+   });
+@@ -88,7 +88,7 @@
+   children.push(paragraph(content.closing, { size: BODY, spacingAfter: 68 }));
+   children.push(paragraph(candidateName, { bold: true, size: BODY }));
+   const doc = new Document({
+-    styles: { default: { document: { run: { font: FONT, size: BODY, color: TEXT }, paragraph: { spacing: { line: LINE }, widowControl: true } } } },
++    styles: { default: { document: { run: { font: FONT, size: BODY, color: TEXT }, paragraph: { spacing: { line: LINE } } } } },
+     sections: [{ properties: { page: { margin: { top: 700, right: 820, bottom: 700, left: 820 } } }, children }],
+   });
+   return Packer.toBuffer(doc);
