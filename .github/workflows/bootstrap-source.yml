@@ -6,32 +6,48 @@ permissions:
   contents: write
 jobs:
   bootstrap:
-    if: ${{ hashFiles('bootstrap/app.tar.gz.b64') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Check bootstrap payload
+        id: payload
+        shell: bash
+        run: |
+          if [ -f bootstrap/app.tar.gz.b64 ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Expand production source
+        if: steps.payload.outputs.present == 'true'
         run: |
           base64 -d bootstrap/app.tar.gz.b64 > /tmp/app.tar.gz
           tar -xzf /tmp/app.tar.gz -C .
           rm -rf bootstrap
       - uses: actions/setup-node@v4
+        if: steps.payload.outputs.present == 'true'
         with:
           node-version: 22
       - name: Install dependencies
+        if: steps.payload.outputs.present == 'true'
         run: npm install --no-audit --no-fund
       - name: Type check
+        if: steps.payload.outputs.present == 'true'
         run: npm run typecheck
       - name: Lint
+        if: steps.payload.outputs.present == 'true'
         run: npm run lint
       - name: Test
+        if: steps.payload.outputs.present == 'true'
         run: npm run test
       - name: Production build
+        if: steps.payload.outputs.present == 'true'
         run: npm run build
       - name: Commit validated source
+        if: steps.payload.outputs.present == 'true'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
