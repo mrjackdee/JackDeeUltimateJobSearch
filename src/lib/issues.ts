@@ -24,6 +24,7 @@ export async function logAppIssue(input: Omit<AppIssue, 'id' | 'occurredAt'>) {
 
 export function plainUserError(fallback: string, error?: unknown) {
   const message = error instanceof Error ? error.message : '';
-  if (message && !/GOOGLE_|OAuth|API|mime|token|credential|stack|ECONN|ENOTFOUND|TypeError|ReferenceError|SyntaxError/i.test(message)) return message;
+  const looksTechnical = /GOOGLE_|OAuth|API|mime|token|credential|stack|ECONN|ENOTFOUND|ENOENT|TypeError|ReferenceError|SyntaxError|Gaxios|invalid_grant|forbidden|permission|status code|\b40[134]\b|\b50[0-9]\b|\.json\b|file id/i.test(message);
+  if (message && !looksTechnical) return message;
   return fallback;
 }
