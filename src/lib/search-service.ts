@@ -2,6 +2,7 @@ import 'server-only';
 import { nanoid } from 'nanoid';
 import { discoverAll, verifyListing } from './job-sources';
 import { basicEligibility, evidenceBasedAnalysis, validateHighScore } from './ai/matching';
+import { specializedDomainMismatch } from './domain-guard';
 import { getState, updateState } from './storage/state';
 import type { Analysis, Job, SearchRun } from './types';
 import { daysOld, fingerprint, normalizeText } from './utils';
@@ -70,7 +71,7 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
       job.resultStatus = 'UPDATED';
     }
 
-    let key = semanticKey(job);
+    const key = semanticKey(job);
     const current = candidateMap.get(key);
     if (current) {
       candidateMap.set(key, chooseCanonical(current, job));
@@ -108,6 +109,11 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
   if (state.careerProfile) {
     for (const job of verified) {
       try {
+        const domainGuard = specializedDomainMismatch(job, state.careerProfile);
+        if (domainGuard.mismatch) {
+          run.excluded++;
+          continue;
+        }
         let analysis = await evidenceBasedAnalysis(job, state.careerProfile, state.settings);
         analysis = await validateHighScore(job, state.careerProfile, analysis);
         if (qualifiesForDisplay(analysis, state.settings.fitThreshold, Boolean(state.settings.showStretchRoles))) {
