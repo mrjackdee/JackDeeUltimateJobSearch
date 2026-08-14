@@ -7,6 +7,7 @@ import { getState, updateState } from './storage/state';
 import type { Analysis, Job, SearchRun } from './types';
 import { daysOld, fingerprint, normalizeText } from './utils';
 import { notifySearchSummary } from './notifications';
+import { logAppIssue } from './issues';
 
 function semanticKey(job: Job) {
   return `${normalizeText(job.company)}|${normalizeText(job.title)}|${normalizeText(job.location)}`;
@@ -45,7 +46,6 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
   const hardFiltered: Job[] = [];
   for (const job of candidateMap.values()) {
     const hard = passesHardFilters(job, state.settings.salaryFloor, state.settings.radiusMiles);
-    // Defer active verification, but enforce all other hard constraints.
     const nonActiveReasons = hard.reasons.filter(r => r !== 'Listing is inactive');
     if (nonActiveReasons.length) { run.excluded++; continue; }
     hardFiltered.push(job);
@@ -66,7 +66,8 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
     for (const job of verified) {
       let analysis = deterministicAnalysis(job, state.careerProfile);
       if (analysis.overallFitScore >= state.settings.fitThreshold) {
-        try { analysis = await interpretAnalysis(job, state.careerProfile, analysis); } catch (error) { run.errors.push(`AI interpretation ${job.company}/${job.title}: ${error instanceof Error ? error.message : 'failed'}`); }
+        try { analysis = await interpretAnalysis(job, state.careerProfile, analysis); }
+        catch (error) { run.errors.push(`AI review ${job.company}/${job.title}: ${error instanceof Error ? error.message : 'failed'}`); }
         analyses.push(analysis);
         run.qualified++;
       } else {
@@ -74,7 +75,7 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
       }
     }
   } else {
-    run.errors.push('Career Evidence Profile is not configured; jobs were discovered but cannot be fit-ranked yet.');
+    run.errors.push('Career Profile is not ready; jobs were found but could not be ranked yet.');
   }
 
   run.completedAt = new Date().toISOString();
@@ -84,6 +85,27 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
     current.searchRuns.unshift(run);
     current.searchRuns = current.searchRuns.slice(0, 100);
   });
-  if (state.notificationsEnabled !== false) { try { const qualifiedJobs = verified.filter(j => analyses.some(a => a.jobId === j.id)).sort((a,b) => (analyses.find(x=>x.jobId===b.id)?.overallFitScore ?? 0) - (analyses.find(x=>x.jobId===a.id)?.overallFitScore ?? 0)); await notifySearchSummary(run, qualifiedJobs); } catch (error) { console.warn('Search notification failed', error instanceof Error ? error.message : error); } }
+
+  if (run.errors.length) {
+    await logAppIssue({
+      area: trigger === 'MANUAL' ? 'Job search' : 'Scheduled search',
+      action: trigger === 'MANUAL' ? 'Search for matching jobs' : 'Run an automatic job search',
+      severity: 'WARNING',
+      userMessage: 'The search finished, but part of the process needed attention. Some job sources or review steps may have been skipped.',
+      technicalMessage: run.errors.join('\n'),
+      route: trigger === 'MANUAL' ? '/api/search' : '/api/cron/search',
+      resolved: false,
+    });
+  }
+
+  if (state.notificationsEnabled !== false) {
+    try {
+      const qualifiedJobs = verified.filter(j => analyses.some(a => a.jobId === j.id)).sort((a,b) => (analyses.find(x=>x.jobId===b.id)?.overallFitScore ?? 0) - (analyses.find(x=>x.jobId===a.id)?.overallFitScore ?? 0));
+      await notifySearchSummary(run, qualifiedJobs);
+    } catch (error) {
+      console.warn('Search notification failed', error instanceof Error ? error.message : error);
+      await logAppIssue({ area:'Email updates', action:'Send the job-search summary email', severity:'WARNING', userMessage:'The job search finished, but the summary email could not be sent.', technicalMessage:error instanceof Error ? error.stack ?? error.message : String(error), route: trigger === 'MANUAL' ? '/api/search' : '/api/cron/search', resolved:false });
+    }
+  }
   return run;
 }
