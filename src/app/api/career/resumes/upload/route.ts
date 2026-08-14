@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { copyFileToFolder, findFileByName, getFileMetadata, uploadBuffer } from '@/lib/storage/google';
 import { updateState } from '@/lib/storage/state';
 import { syncCareerProfile } from '@/lib/career';
+import { logAppIssue } from '@/lib/issues';
 import type { SearchLane } from '@/lib/types';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -38,24 +39,16 @@ export async function POST(request: NextRequest) {
     const hasFile = file instanceof File && file.size > 0;
     const googleDocId = extractGoogleDocId(googleDocInput);
 
-    if (!hasFile && !googleDocId) {
-      return NextResponse.json({ error: 'Choose a DOCX or PDF file, or paste a Google Docs link before continuing.' }, { status: 400 });
-    }
-    if (googleDocInput && !googleDocId) {
-      return NextResponse.json({ error: 'That Google Docs link does not look complete. Open the document in Google Docs, copy the full address from your browser, and try again.' }, { status: 400 });
-    }
-    if (hasFile && googleDocId) {
-      return NextResponse.json({ error: 'Please choose only one resume source. Either upload a DOCX/PDF file or use a Google Docs link.' }, { status: 400 });
-    }
+    if (!hasFile && !googleDocId) return NextResponse.json({ error: 'Choose a DOCX or PDF file, or paste a Google Docs link before continuing.' }, { status: 400 });
+    if (googleDocInput && !googleDocId) return NextResponse.json({ error: 'That Google Docs link does not look complete. Open the document in Google Docs, copy the full address from your browser, and try again.' }, { status: 400 });
+    if (hasFile && googleDocId) return NextResponse.json({ error: 'Please choose only one resume source. Either upload a DOCX/PDF file or use a Google Docs link.' }, { status: 400 });
 
     const folder = await masterFolderId();
     let stored: { id: string; url: string };
 
     if (googleDocId) {
       const meta = await getFileMetadata(googleDocId);
-      if (meta.mimeType !== GOOGLE_DOC_MIME) {
-        return NextResponse.json({ error: 'That link is not a Google Doc. Open the resume in Google Docs and paste that document link instead.' }, { status: 400 });
-      }
+      if (meta.mimeType !== GOOGLE_DOC_MIME) return NextResponse.json({ error: 'That link is not a Google Doc. Open the resume in Google Docs and paste that document link instead.' }, { status: 400 });
       const cleanName = name.replace(/[^a-z0-9 _-]/gi, '').trim() || 'Updated Master Resume';
       stored = await copyFileToFolder({ fileId: googleDocId, name: `${cleanName}_${new Date().toISOString().slice(0,10)}`, parentId: folder });
     } else {
@@ -63,12 +56,8 @@ export async function POST(request: NextRequest) {
       const lower = resumeFile.name.toLowerCase();
       const isDocx = lower.endsWith('.docx') || resumeFile.type === DOCX_MIME;
       const isPdf = lower.endsWith('.pdf') || resumeFile.type === PDF_MIME;
-      if (!isDocx && !isPdf) {
-        return NextResponse.json({ error: 'Please choose a Word DOCX file or PDF file.' }, { status: 400 });
-      }
-      if (resumeFile.size > 10_000_000) {
-        return NextResponse.json({ error: 'That resume is larger than 10 MB. Please use a smaller file and try again.' }, { status: 400 });
-      }
+      if (!isDocx && !isPdf) return NextResponse.json({ error: 'Please choose a Word DOCX file or PDF file.' }, { status: 400 });
+      if (resumeFile.size > 10_000_000) return NextResponse.json({ error: 'That resume is larger than 10 MB. Please use a smaller file and try again.' }, { status: 400 });
       const extension = isPdf ? 'pdf' : 'docx';
       const mimeType = isPdf ? PDF_MIME : DOCX_MIME;
       const cleanName = name.replace(/[^a-z0-9 _-]/gi, '').trim() || 'Updated Master Resume';
@@ -89,6 +78,7 @@ export async function POST(request: NextRequest) {
     const message = error instanceof Error && !/GOOGLE_|OAuth|API|mime|token|credential/i.test(error.message)
       ? error.message
       : 'The resume could not be saved right now. Please try again. If this keeps happening, confirm that Google Drive is connected in Settings.';
+    await logAppIssue({ area: 'Resume setup', action: 'Add or change the baseline resume', severity: 'ERROR', userMessage: message, technicalMessage: error instanceof Error ? error.stack ?? error.message : String(error), route: '/api/career/resumes/upload', statusCode: 500, resolved: false });
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
