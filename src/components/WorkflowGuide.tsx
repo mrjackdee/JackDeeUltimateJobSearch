@@ -24,50 +24,50 @@ type Step = {
 export function WorkflowGuide({ status, compact = false }: { status: WorkflowStatus; compact?: boolean }) {
   const steps: Step[] = [
     {
-      title: 'Choose your baseline resume',
-      description: 'Add or select the resume the system should use as the source for analysis and tailoring.',
+      title: 'Choose your main resume',
+      description: 'Add or select the resume the app should start from when it compares you with jobs and prepares tailored materials.',
       href: '/settings#baseline-resume',
-      action: 'Set baseline',
+      action: 'Choose resume',
       done: status.baselineReady,
       icon: FileText,
     },
     {
-      title: 'Build your Career Evidence Profile',
-      description: 'Sync approved resume evidence so AI recommendations stay grounded in your documented experience.',
+      title: 'Create your Career Profile',
+      description: 'Let the app build a private summary of your experience, skills, education, and accomplishments from your approved resume files.',
       href: '/settings#career-profile',
-      action: 'Sync profile',
+      action: 'Create profile',
       done: status.careerProfileReady,
       icon: Target,
     },
     {
-      title: 'Find opportunities',
-      description: 'Run the job search for matching roles, or import a specific employer posting you already found.',
+      title: 'Find jobs',
+      description: 'Run a search for matching jobs, or add a specific employer posting that you already found somewhere else.',
       href: '/#job-search',
-      action: 'Search roles',
+      action: 'Search for jobs',
       alternateHref: '/import',
-      alternateAction: 'Import a role',
+      alternateAction: 'Add a job I found',
       done: status.searchCompleted,
       icon: Search,
     },
     {
-      title: 'Review match intelligence',
-      description: 'Compare fit, ATS alignment, gaps, compensation, and overqualification risk before deciding to apply.',
+      title: 'Review your best matches',
+      description: 'See how well each job fits your experience, where there may be gaps, and whether the role is worth pursuing.',
       href: '/#opportunities',
       action: 'Review matches',
       done: status.analysisReady,
       icon: Sparkles,
     },
     {
-      title: 'Prepare an application package',
-      description: 'Generate the tailored resume and cover letter only for roles you decide are worth pursuing.',
+      title: 'Prepare your application materials',
+      description: 'Create a tailored resume and cover letter only for jobs you decide are worth pursuing.',
       href: '/applications',
-      action: 'Prepare package',
+      action: 'Prepare materials',
       done: status.packageReady,
       icon: Upload,
     },
     {
-      title: 'Track the application',
-      description: 'Record submission status, recruiter activity, interviews, follow-ups, offers, and final outcomes.',
+      title: 'Track what happens next',
+      description: 'Keep your application status, recruiter contact, interviews, follow-ups, offers, and final outcome up to date.',
       href: '/applications',
       action: 'Track applications',
       done: status.applicationTracked,
@@ -84,16 +84,16 @@ export function WorkflowGuide({ status, compact = false }: { status: WorkflowSta
     return (
       <section className="workflow-summary" aria-labelledby="workflow-summary-title">
         <div className="workflow-summary-copy">
-          <div className="eyebrow">Guided workflow</div>
-          <h2 id="workflow-summary-title">{nextStep ? `Next: ${nextStep.title}` : 'Workflow complete'}</h2>
-          <p>{nextStep ? nextStep.description : 'Your core job-search workflow is configured and active. Continue reviewing and tracking new opportunities.'}</p>
+          <div className="eyebrow">Your next step</div>
+          <h2 id="workflow-summary-title">{nextStep ? nextStep.title : 'You are ready to keep your search moving'}</h2>
+          <p>{nextStep ? nextStep.description : 'Your main setup steps are complete. Continue reviewing new jobs and keeping application progress current.'}</p>
         </div>
         <div className="workflow-summary-side">
           <div className="workflow-progress-label"><span>{completed} of {steps.length} steps</span><strong>{progress}%</strong></div>
           <div className="workflow-progress-track" aria-label={`${progress}% complete`}><span style={{ width: `${progress}%` }} /></div>
           <div className="workflow-summary-actions">
             {nextStep && <Link className="button primary" href={nextStep.href}>{nextStep.action}<ChevronRight size={15}/></Link>}
-            <Link className="button" href="/guide">View all steps</Link>
+            <Link className="button" href="/guide">See all steps</Link>
           </div>
         </div>
       </section>
@@ -106,7 +106,7 @@ export function WorkflowGuide({ status, compact = false }: { status: WorkflowSta
         <div>
           <div className="eyebrow">Your progress</div>
           <h2>{progress}% complete</h2>
-          <p className="fit">Follow the steps in order the first time. After setup, you can jump directly to any step whenever your search changes.</p>
+          <p className="fit">Follow these steps in order the first time. After setup, you can return to any step whenever your job search changes.</p>
         </div>
         <div className="workflow-progress-block">
           <div className="workflow-progress-label"><span>{completed} of {steps.length} steps complete</span><strong>{progress}%</strong></div>
@@ -122,10 +122,10 @@ export function WorkflowGuide({ status, compact = false }: { status: WorkflowSta
             <article className={`workflow-step ${step.done ? 'complete' : ''} ${isCurrent ? 'current' : ''}`} key={step.title}>
               <div className="workflow-step-marker">{step.done ? <Check size={17}/> : <span>{index + 1}</span>}</div>
               <div className="workflow-step-body">
-                <div className="workflow-step-title-row"><Icon size={17}/><h3>{step.title}</h3>{step.done && <span className="badge good">Complete</span>}{isCurrent && <span className="badge">Next step</span>}</div>
+                <div className="workflow-step-title-row"><Icon size={17}/><h3>{step.title}</h3>{step.done && <span className="badge good">Done</span>}{isCurrent && <span className="badge">Do this next</span>}</div>
                 <p>{step.description}</p>
                 <div className="workflow-step-actions">
-                  <Link className={isCurrent ? 'button primary' : 'button'} href={step.href}>{step.done ? 'Open step' : step.action}<ChevronRight size={15}/></Link>
+                  <Link className={isCurrent ? 'button primary' : 'button'} href={step.href}>{step.done ? 'Open this step' : step.action}<ChevronRight size={15}/></Link>
                   {step.alternateHref && <Link className="button subtle" href={step.alternateHref}>{step.alternateAction}</Link>}
                 </div>
               </div>
@@ -135,12 +135,12 @@ export function WorkflowGuide({ status, compact = false }: { status: WorkflowSta
       </div>
 
       <section className="panel workflow-usage-notes">
-        <h2>How the system is designed to work</h2>
+        <h2>A few things to remember</h2>
         <div className="workflow-rules">
-          <div><Circle size={11}/><p><strong>Start with evidence.</strong> Your baseline resume and Career Evidence Profile define what the system is allowed to claim about your experience.</p></div>
-          <div><Circle size={11}/><p><strong>Search before generating.</strong> Review match intelligence before spending time creating an application package.</p></div>
-          <div><Circle size={11}/><p><strong>You make the application decision.</strong> The app prepares and organizes materials, but it does not automatically submit job applications.</p></div>
-          <div><Circle size={11}/><p><strong>Keep statuses current.</strong> Tracking recruiter contact, interviews, follow-ups, and outcomes keeps the command center useful over time.</p></div>
+          <div><Circle size={11}/><p><strong>Start with your resume.</strong> The app bases its recommendations on the experience you have documented.</p></div>
+          <div><Circle size={11}/><p><strong>Review a job before preparing materials.</strong> This helps you focus your time on roles that are actually worth pursuing.</p></div>
+          <div><Circle size={11}/><p><strong>You decide where to apply.</strong> The app can prepare and organize materials, but it does not submit job applications for you.</p></div>
+          <div><Circle size={11}/><p><strong>Keep application progress current.</strong> Recording recruiter contact, interviews, follow-ups, and outcomes keeps the app useful over time.</p></div>
         </div>
       </section>
     </div>
