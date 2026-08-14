@@ -2,13 +2,32 @@ import type { AppState, MasterResume, SearchSettings } from './types';
 
 export const defaultSettings: SearchSettings = {
   salaryFloor: 100000,
-  radiusMiles: 25,
+  targetSalary: 200000,
+  remoteSalaryFloor: 100000,
+  hybridOnsiteSalaryFloor: 125000,
+  radiusMiles: 35,
   lookbackDays: 7,
   fitThreshold: 80,
+  showStretchRoles: false,
+  showContractRoles: false,
   autoPrepareThreshold: 90,
   morningHourEastern: 7,
   afternoonHourEastern: 16,
   remoteFirst: true,
+  targetCompanies: [
+    'Google',
+    'Meta',
+    'Anthropic',
+    'JLL',
+    'Cushman & Wakefield',
+    'Caterpillar',
+    'UnitedHealth Group',
+    'Optum',
+    'UnitedHealthcare',
+    'Blue Cross Blue Shield',
+    'AT&T',
+    'T-Mobile',
+  ],
 };
 
 export const defaultMasterResumes: MasterResume[] = [
