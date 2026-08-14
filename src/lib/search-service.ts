@@ -1,6 +1,7 @@
 import 'server-only';
 import { nanoid } from 'nanoid';
-import { discoverAll, verifyListing } from './job-sources';
+import { discoverAll } from './job-sources';
+import { enrichAndVerifyListing } from './listing-enrichment';
 import { basicEligibility, evidenceBasedAnalysis, validateHighScore } from './ai/matching';
 import { specializedDomainMismatch } from './domain-guard';
 import { getState, updateState } from './storage/state';
@@ -93,12 +94,14 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
   }
 
   const verified: Job[] = [];
-  const batchSize = 6;
+  const batchSize = 5;
   const candidates = [...candidateMap.values()];
   for (let i = 0; i < candidates.length; i += batchSize) {
-    const batch = await Promise.all(candidates.slice(i, i + batchSize).map(verifyListing));
+    const batch = await Promise.all(candidates.slice(i, i + batchSize).map(enrichAndVerifyListing));
     for (const job of batch) {
       if (job.verificationStatus === 'INACTIVE' || !job.active) { run.inactive++; continue; }
+      const employerDate = job.employerDatePosted || job.datePosted;
+      if (employerDate && daysOld(employerDate) > state.settings.lookbackDays) { run.excluded++; continue; }
       const eligibility = basicEligibility(job, state.settings);
       if (!eligibility.pass) { run.excluded++; continue; }
       verified.push(job);
