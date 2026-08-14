@@ -4,6 +4,8 @@ import { discoverAll } from './job-sources';
 import { enrichAndVerifyListing } from './listing-enrichment';
 import { basicEligibility, evidenceBasedAnalysis, validateHighScore } from './ai/matching';
 import { specializedDomainMismatch } from './domain-guard';
+import { applyApplicationPriority } from './priority-context';
+import { contactsFromState } from './network';
 import { getState, updateState } from './storage/state';
 import type { Analysis, Job, SearchRun } from './types';
 import { daysOld, fingerprint, normalizeText } from './utils';
@@ -41,6 +43,7 @@ function qualifiesForDisplay(analysis: Analysis, fitThreshold: number, showStret
 export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRun> {
   const run: SearchRun = { id: nanoid(), startedAt: new Date().toISOString(), trigger, discovered: 0, qualified: 0, excluded: 0, inactive: 0, duplicates: 0, errors: [] };
   const state = await getState();
+  const contacts = contactsFromState(state);
   const { jobs: discovered, errors } = await discoverAll(state.settings.targetCompanies ?? []);
   run.errors.push(...errors);
   run.discovered = discovered.length;
@@ -119,6 +122,7 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
         }
         let analysis = await evidenceBasedAnalysis(job, state.careerProfile, state.settings);
         analysis = await validateHighScore(job, state.careerProfile, analysis);
+        analysis = applyApplicationPriority(analysis, job, state.settings, contacts);
         if (qualifiesForDisplay(analysis, state.settings.fitThreshold, Boolean(state.settings.showStretchRoles))) {
           analyses.push(analysis);
           run.qualified++;
