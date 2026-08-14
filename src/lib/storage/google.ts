@@ -1,28 +1,31 @@
 import 'server-only';
 import { google } from 'googleapis';
 import { Readable } from 'node:stream';
+import { loadGoogleUserRefreshToken } from '../google-user-token';
 
 export function googleConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID);
+  const oauth = Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID && process.env.GOOGLE_OAUTH_CLIENT_SECRET);
+  const bootstrap = Boolean(process.env.GOOGLE_USER_REFRESH_TOKEN || (process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY));
+  return Boolean(oauth && bootstrap && process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID);
 }
 
-export function googleAuth() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-  if (!email || !privateKey) throw new Error('Google service-account credentials are not configured.');
-  return new google.auth.JWT({
-    email,
-    key: privateKey,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
+export async function googleAuth() {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  if (!clientId || !clientSecret) throw new Error('Google OAuth is not configured.');
+  const refreshToken = await loadGoogleUserRefreshToken();
+  if (!refreshToken) throw new Error('Google Drive is not authorized yet. Sign in with Google once to complete setup.');
+  const auth = new google.auth.OAuth2(clientId, clientSecret);
+  auth.setCredentials({ refresh_token: refreshToken });
+  return auth;
 }
 
-export function driveClient() {
-  return google.drive({ version: 'v3', auth: googleAuth() });
+export async function driveClient() {
+  return google.drive({ version: 'v3', auth: await googleAuth() });
 }
 
 export async function findFileByName(name: string, parentId: string, mimeType?: string) {
-  const drive = driveClient();
+  const drive = await driveClient();
   const escaped = name.replace(/'/g, "\\'");
   const clauses = [`name = '${escaped}'`, `'${parentId}' in parents`, 'trashed = false'];
   if (mimeType) clauses.push(`mimeType = '${mimeType}'`);
@@ -33,7 +36,7 @@ export async function findFileByName(name: string, parentId: string, mimeType?: 
 export async function ensureFolder(name: string, parentId: string): Promise<{ id: string; url: string }> {
   const existing = await findFileByName(name, parentId, 'application/vnd.google-apps.folder');
   if (existing?.id) return { id: existing.id, url: existing.webViewLink ?? `https://drive.google.com/drive/folders/${existing.id}` };
-  const drive = driveClient();
+  const drive = await driveClient();
   const created = await drive.files.create({
     requestBody: { name, mimeType: 'application/vnd.google-apps.folder', parents: [parentId] },
     fields: 'id,webViewLink',
@@ -49,7 +52,7 @@ export async function uploadBuffer(args: {
   buffer: Buffer;
   replaceFileId?: string;
 }): Promise<{ id: string; url: string }> {
-  const drive = driveClient();
+  const drive = await driveClient();
   if (args.replaceFileId) {
     const updated = await drive.files.update({
       fileId: args.replaceFileId,
@@ -70,7 +73,7 @@ export async function uploadBuffer(args: {
 }
 
 export async function downloadFile(fileId: string): Promise<Buffer> {
-  const drive = driveClient();
+  const drive = await driveClient();
   const meta = await drive.files.get({ fileId, fields: 'id,name,mimeType' });
   const mime = meta.data.mimeType ?? '';
   if (mime === 'application/vnd.google-apps.document') {
@@ -82,7 +85,7 @@ export async function downloadFile(fileId: string): Promise<Buffer> {
 }
 
 export async function listFolder(parentId: string) {
-  const drive = driveClient();
+  const drive = await driveClient();
   const res = await drive.files.list({
     q: `'${parentId}' in parents and trashed = false`,
     fields: 'files(id,name,mimeType,webViewLink,modifiedTime,size)',

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   if (!payload?.email_verified) return NextResponse.redirect(new URL('/login?error=unverified', request.url));
   const allowed = (process.env.ALLOWED_LOGIN_EMAIL ?? 'jackdee.sync@gmail.com').toLowerCase();
   if (!email || email !== allowed) return NextResponse.redirect(new URL('/login?error=unauthorized', request.url));
-  if (tokens.refresh_token) await saveGoogleUserRefreshToken(tokens.refresh_token);
+  if (tokens.refresh_token) await saveGoogleUserRefreshToken(tokens.refresh_token, tokens.access_token ?? undefined);
   const secret = process.env.APP_SESSION_SECRET;
   if (!secret) throw new Error('APP_SESSION_SECRET is not configured.');
   const response = NextResponse.redirect(new URL('/', request.url));
