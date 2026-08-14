@@ -8,7 +8,13 @@ export async function GET(request: NextRequest) {
   const url = oauth.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
-    scope: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/gmail.send'],
+    scope: [
+      'openid',
+      'email',
+      'profile',
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/drive',
+    ],
     state,
   });
   const response = NextResponse.redirect(url);
