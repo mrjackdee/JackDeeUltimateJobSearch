@@ -1,0 +1,27 @@
+name: Install Vercel Analytics
+on:
+  push:
+    branches: ['feature/vercel-analytics']
+permissions:
+  contents: write
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/vercel-analytics
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install analytics package
+        run: npm install @vercel/analytics --no-audit --no-fund
+      - name: Commit package files and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/install-vercel-analytics-temp.yml
+          git add package.json package-lock.json
+          git commit -m 'feat: add Vercel Analytics dependency'
+          git push origin HEAD:feature/vercel-analytics
