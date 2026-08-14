@@ -6,6 +6,8 @@ import type { Job, SearchLane, WorkArrangement } from '@/lib/types';
 import { enrichAndVerifyListing } from '@/lib/listing-enrichment';
 import { basicEligibility, evidenceBasedAnalysis, validateHighScore } from '@/lib/ai/matching';
 import { specializedDomainMismatch } from '@/lib/domain-guard';
+import { applyApplicationPriority } from '@/lib/priority-context';
+import { contactsFromState } from '@/lib/network';
 import { getState, updateState } from '@/lib/storage/state';
 import { logAppIssue, plainUserError } from '@/lib/issues';
 
@@ -99,6 +101,7 @@ export async function POST(request: NextRequest) {
 
     let analysis = await evidenceBasedAnalysis(verified, state.careerProfile, state.settings);
     analysis = await validateHighScore(verified, state.careerProfile, analysis);
+    analysis = applyApplicationPriority(analysis, verified, state.settings, contactsFromState(state));
     const qualifies = !analysis.disqualified && (analysis.overallFitScore >= state.settings.fitThreshold || (state.settings.showStretchRoles && analysis.overallFitScore >= 70));
 
     await updateState(current => {
