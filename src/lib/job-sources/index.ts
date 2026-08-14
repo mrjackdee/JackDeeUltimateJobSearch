@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import type { Job, SearchLane, WorkArrangement } from '../types';
 import { expiredSignals } from '../config';
 import { fingerprint, normalizeText, parseSalary } from '../utils';
+import { coreStrategicSearchContexts, relevantRoleTitle, targetCompanySearchContexts } from '../search-strategy';
 
 export interface DiscoveryContext {
   lane: SearchLane;
@@ -38,9 +39,15 @@ function employmentType(value = '', description = ''): Job['employmentType'] {
   return 'UNKNOWN';
 }
 
+function descriptionCompleteness(description: string): Job['descriptionCompleteness'] {
+  if (description.length >= 3000) return 'FULL';
+  if (description.length >= 1200) return 'MOSTLY_COMPLETE';
+  return 'PARTIAL';
+}
+
 function makeJob(input: Partial<Job> & Pick<Job, 'title' | 'company' | 'applicationUrl' | 'description' | 'location' | 'source' | 'searchLane'>): Job {
   const arrangement = input.workArrangement ?? inferArrangement(input.location, input.description);
-  const fp = input.duplicateFingerprint ?? fingerprint([input.company, input.title, input.location, input.externalId, input.applicationUrl]);
+  const fp = input.duplicateFingerprint ?? fingerprint([input.company, input.title, input.location, input.externalId, input.requisitionNumber, input.applicationUrl]);
   return {
     ...input,
     id: input.id ?? nanoid(),
@@ -49,6 +56,7 @@ function makeJob(input: Partial<Job> & Pick<Job, 'title' | 'company' | 'applicat
     applicationUrl: input.applicationUrl,
     sourceUrl: input.sourceUrl ?? input.applicationUrl,
     description: input.description,
+    descriptionCompleteness: input.descriptionCompleteness ?? descriptionCompleteness(input.description),
     location: input.location || 'Remote',
     workArrangement: arrangement,
     employmentType: input.employmentType ?? employmentType('', input.description),
@@ -76,6 +84,7 @@ export class RemotiveSource implements JobSource {
       const salary = parseSalary(String(j.salary ?? ''));
       return makeJob({
         externalId: String(j.id ?? ''),
+        requisitionNumber: String(j.id ?? '') || undefined,
         title: String(j.title ?? ''),
         company: String(j.company_name ?? ''),
         companyLogo: String(j.company_logo ?? '') || undefined,
@@ -109,6 +118,7 @@ export class JobicySource implements JobSource {
       const description = stripHtml(String(j.jobDescription ?? ''));
       return makeJob({
         externalId: String(j.id ?? ''),
+        requisitionNumber: String(j.id ?? '') || undefined,
         title: String(j.jobTitle ?? ''),
         company: String(j.companyName ?? ''),
         companyLogo: String(j.companyLogo ?? '') || undefined,
@@ -150,6 +160,7 @@ export class SerpApiGoogleJobsSource implements JobSource {
       const posted = extensions.find(x => /ago|today|day|hour/i.test(x));
       return makeJob({
         externalId: String(j.job_id ?? ''),
+        requisitionNumber: String(j.job_id ?? '') || undefined,
         title: String(j.title ?? ''),
         company: String(j.company_name ?? ''),
         applicationUrl: String(applyUrl),
@@ -202,9 +213,9 @@ export async function verifyListing(job: Job): Promise<Job> {
 
 export function classifyLane(title: string, fallback: SearchLane): SearchLane {
   const n = normalizeText(title);
-  if (/scrum|agile/.test(n)) return 'AGILE';
+  if (/scrum|agile|release train/.test(n)) return 'AGILE';
   if (/product owner/.test(n)) return 'PRODUCT';
-  if (/director|principal|senior director|transformation/.test(n)) return 'EXECUTIVE';
+  if (/director|principal|senior director|transformation|technology strategy|strategic initiatives|portfolio/.test(n)) return 'EXECUTIVE';
   return fallback;
 }
 
@@ -212,42 +223,35 @@ export function defaultSources(): JobSource[] {
   return [new RemotiveSource(), new JobicySource(), new SerpApiGoogleJobsSource()];
 }
 
-export async function discoverAll(): Promise<{ jobs: Job[]; errors: string[] }> {
+export async function discoverAll(targetCompanies: string[] = []): Promise<{ jobs: Job[]; errors: string[] }> {
   const jobs: Job[] = [];
   const errors: string[] = [];
 
-  const targetTitle = /\b(project manager|program manager|technical project|technical program|delivery manager|portfolio manager|scrum master|agile (?:lead|delivery|program)|product owner|director.*(?:program|project|pmo|transformation|portfolio|delivery)|pmo director|principal program|strategic program|implementation project)\b/i;
-
-  // Public remote feeds are intentionally called once per run. Their APIs publish
-  // freshness delays and fair-use guidance, so role filtering happens locally.
+  // Public remote feeds are called once per run. Filtering happens locally so
+  // the app can cover program leadership plus strategic transformation titles.
   for (const source of [new RemotiveSource(), new JobicySource()]) {
     try {
       const found = await source.discover({ lane: 'PROGRAM_PROJECT', query: '' });
-      jobs.push(...found.filter(j => targetTitle.test(j.title)).map(j => ({ ...j, searchLane: classifyLane(j.title, 'PROGRAM_PROJECT') })));
+      jobs.push(...found.filter(j => relevantRoleTitle.test(j.title)).map(j => ({ ...j, searchLane: classifyLane(j.title, 'PROGRAM_PROJECT') })));
     } catch (error) {
       errors.push(`${source.name}: ${error instanceof Error ? error.message : 'unknown error'}`);
     }
   }
 
-  // SerpApi is the broad discovery adapter when configured. Keep the query set
-  // intentionally compact while covering executive, project/program, Agile, and Product lanes.
+  // SerpApi provides broader U.S. discovery when configured. Searches include
+  // senior program leadership, transformation, AI enablement, Agile, Product,
+  // Atlanta/Dallas hybrid roles, nationwide remote roles, and target companies.
   const serp = new SerpApiGoogleJobsSource();
   if (process.env.SERPAPI_KEY) {
     const contexts: DiscoveryContext[] = [
-      { lane: 'EXECUTIVE', query: 'director program management', location: 'Atlanta, Georgia' },
-      { lane: 'EXECUTIVE', query: 'director program management', location: 'Dallas, Texas' },
-      { lane: 'EXECUTIVE', query: 'director program management remote', location: 'United States' },
-      { lane: 'PROGRAM_PROJECT', query: 'senior program manager OR senior project manager', location: 'Atlanta, Georgia' },
-      { lane: 'PROGRAM_PROJECT', query: 'senior program manager OR senior project manager', location: 'Dallas, Texas' },
-      { lane: 'PROGRAM_PROJECT', query: 'program manager OR project manager remote', location: 'United States' },
-      { lane: 'AGILE', query: 'scrum master OR agile delivery lead remote', location: 'United States' },
-      { lane: 'PRODUCT', query: 'product owner OR senior product owner remote', location: 'United States' },
+      ...coreStrategicSearchContexts(),
+      ...targetCompanySearchContexts(targetCompanies),
     ];
     for (let i = 0; i < contexts.length; i += 3) {
       await Promise.all(contexts.slice(i, i + 3).map(async ctx => {
         try {
           const found = await serp.discover(ctx);
-          jobs.push(...found.filter(j => targetTitle.test(j.title)).map(j => ({ ...j, searchLane: classifyLane(j.title, ctx.lane) })));
+          jobs.push(...found.filter(j => relevantRoleTitle.test(j.title)).map(j => ({ ...j, searchLane: classifyLane(j.title, ctx.lane) })));
         } catch (error) {
           errors.push(`${serp.name}: ${error instanceof Error ? error.message : 'unknown error'}`);
         }
