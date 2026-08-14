@@ -1,8 +1,14 @@
 export type WorkArrangement = 'REMOTE' | 'HYBRID' | 'ONSITE' | 'UNKNOWN';
 export type VerificationStatus = 'ACTIVE_VERIFIED' | 'ACTIVE_LIKELY' | 'STATUS_UNCERTAIN' | 'INACTIVE';
 export type SearchLane = 'EXECUTIVE' | 'PROGRAM_PROJECT' | 'AGILE' | 'PRODUCT';
-export type PriorityLabel = 'APPLY_NOW' | 'HIGH_PRIORITY' | 'STRATEGIC' | 'BRIDGE_ROLE' | 'STRETCH' | 'SKIP';
+export type PriorityLabel = 'APPLY_NOW' | 'HIGH_PRIORITY' | 'REVIEW' | 'STRATEGIC' | 'BRIDGE_ROLE' | 'STRETCH' | 'SKIP';
 export type OverqualificationRisk = 'LOW' | 'MEDIUM' | 'HIGH';
+export type MatchConfidence = 'HIGH' | 'MEDIUM' | 'LOW';
+export type EvidenceClassification = 'DIRECT' | 'TRANSFERABLE' | 'ADJACENT' | 'MISSING' | 'CONTRADICTORY';
+export type GapSeverity = 'MINOR' | 'MODERATE' | 'SIGNIFICANT' | 'POTENTIAL_DISQUALIFIER';
+export type ResumeCompetitiveness = 'HIGHLY_COMPETITIVE' | 'COMPETITIVE' | 'POSSIBLE' | 'WEAK' | 'NOT_COMPETITIVE';
+export type ResultStatus = 'NEW' | 'PREVIOUSLY_SEEN' | 'SAVED' | 'APPLIED' | 'INTERVIEWING' | 'REJECTED_BY_USER' | 'EXPIRED' | 'UPDATED';
+export type CompensationLabel = 'ABOVE_TARGET' | 'WITHIN_TARGET' | 'BELOW_TARGET' | 'NOT_DISCLOSED';
 export type ApplicationStatus =
   | 'DISCOVERED'
   | 'REVIEWING'
@@ -34,6 +40,7 @@ export interface AppIssue {
 export interface Job {
   id: string;
   externalId?: string;
+  requisitionNumber?: string;
   title: string;
   company: string;
   companyLogo?: string;
@@ -41,6 +48,7 @@ export interface Job {
   applicationUrl: string;
   sourceUrl?: string;
   description: string;
+  descriptionCompleteness?: 'FULL' | 'MOSTLY_COMPLETE' | 'PARTIAL';
   location: string;
   city?: string;
   state?: string;
@@ -54,6 +62,7 @@ export interface Job {
   equity?: string;
   benefits?: string[];
   datePosted?: string;
+  employerDatePosted?: string;
   dateDiscovered: string;
   lastVerifiedDate?: string;
   source: string;
@@ -62,7 +71,20 @@ export interface Job {
   repost: boolean;
   duplicateFingerprint: string;
   active: boolean;
+  resultStatus?: ResultStatus;
   raw?: Record<string, unknown>;
+}
+
+export interface RequirementEvaluation {
+  requirement: string;
+  category: 'CORE_RESPONSIBILITY' | 'REQUIRED_QUALIFICATION' | 'PREFERRED_QUALIFICATION' | 'SENIORITY_SCOPE' | 'DOMAIN' | 'TECHNOLOGY_METHODOLOGY' | 'LOCATION_COMPENSATION' | 'OTHER';
+  importance: 'HARD' | 'HIGH' | 'MEDIUM' | 'LOW';
+  resumeEvidence: string[];
+  evidenceClassification: EvidenceClassification;
+  pass: boolean;
+  scoreImpact: number;
+  gapSeverity?: GapSeverity;
+  notes?: string;
 }
 
 export interface QualificationBreakdown {
@@ -74,6 +96,19 @@ export interface QualificationBreakdown {
   locationFit: number;
   compensationFit: number;
   recency: number;
+  coreResponsibilities?: number;
+  requiredExperienceQualifications?: number;
+  seniorityOrganizationalScope?: number;
+  industryDomainAlignment?: number;
+  technologyMethodologyAlignment?: number;
+  locationEmploymentCompensation?: number;
+  penalties?: number;
+}
+
+export interface MatchGap {
+  requirement: string;
+  severity: GapSeverity;
+  explanation: string;
 }
 
 export interface Analysis {
@@ -108,6 +143,21 @@ export interface Analysis {
   recommendedMasterResume: string;
   priorityRecommendation: PriorityLabel;
   priorityScore: number;
+  disqualified?: boolean;
+  disqualificationReasons?: string[];
+  matchConfidence?: MatchConfidence;
+  matchLabel?: string;
+  requirementEvaluations?: RequirementEvaluation[];
+  keyResumeEvidence?: Array<{ label: string; evidence: string }>;
+  gapDetails?: MatchGap[];
+  whySelected?: string;
+  resumeCompetitiveness?: ResumeCompetitiveness;
+  compensationLabel?: CompensationLabel;
+  compensationRisk?: boolean;
+  applicationRecommendation?: 'APPLY_NOW' | 'APPLY' | 'REVIEW_BEFORE_APPLYING' | 'STRETCH_APPLICATION' | 'DO_NOT_APPLY';
+  validatorScore?: number;
+  validatorDelta?: number;
+  validatorNotes?: string[];
 }
 
 export interface ApplicationPackage {
@@ -218,13 +268,19 @@ export interface SearchRun {
 
 export interface SearchSettings {
   salaryFloor: number;
+  targetSalary?: number;
+  remoteSalaryFloor?: number;
+  hybridOnsiteSalaryFloor?: number;
   radiusMiles: number;
   lookbackDays: number;
   fitThreshold: number;
+  showStretchRoles?: boolean;
+  showContractRoles?: boolean;
   autoPrepareThreshold: number;
   morningHourEastern: number;
   afternoonHourEastern: number;
   remoteFirst: boolean;
+  targetCompanies?: string[];
 }
 
 export interface AppState {
