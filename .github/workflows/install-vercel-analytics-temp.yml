@@ -16,7 +16,7 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install analytics package
-        run: npm install @vercel/analytics --no-audit --no-fund
+        run: npm install @vercel/analytics --legacy-peer-deps --no-audit --no-fund
       - name: Commit package files and remove temporary workflow
         run: |
           git config user.name 'github-actions[bot]'
