@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
 import './globals.css';
+import './ux.css';
 import { Header } from '@/components/Header';
 import { Nav } from '@/components/Nav';
 

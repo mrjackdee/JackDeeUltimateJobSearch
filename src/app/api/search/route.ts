@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { runSearch } from '@/lib/search-service';
 import { getState } from '@/lib/storage/state';
 import { prepareApplication } from '@/lib/package-service';
+import { logAppIssue, plainUserError } from '@/lib/issues';
 export const maxDuration = 300;
 export async function POST() {
   try {
@@ -14,8 +15,16 @@ export async function POST() {
     const preparationErrors: string[] = [];
     for (const analysis of auto) {
       try { const pkg = await prepareApplication(analysis.jobId); prepared.push(pkg.id); }
-      catch (error) { preparationErrors.push(`${analysis.jobId}: ${error instanceof Error ? error.message : 'prepare failed'}`); }
+      catch (error) {
+        const technical = error instanceof Error ? error.message : 'Unknown preparation error';
+        preparationErrors.push('One matching role could not be prepared automatically.');
+        await logAppIssue({ area: 'Application preparation', action: 'Prepare a high-match role after search', severity: 'ERROR', userMessage: 'One matching role could not be prepared automatically. You can still review the role and try preparing it manually.', technicalMessage: `${analysis.jobId}: ${technical}`, route: '/api/search', statusCode: 500, resolved: false });
+      }
     }
     return NextResponse.json({ ...run, autoPrepared: prepared.length, preparationErrors });
-  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Search failed' }, { status: 500 }); }
+  } catch (error) {
+    const userMessage = plainUserError('The job search could not be completed right now. Please try again in a few minutes.', error);
+    await logAppIssue({ area: 'Job search', action: 'Run a manual job search', severity: 'ERROR', userMessage, technicalMessage: error instanceof Error ? error.stack ?? error.message : String(error), route: '/api/search', statusCode: 500, resolved: false });
+    return NextResponse.json({ error: userMessage }, { status: 500 });
+  }
 }

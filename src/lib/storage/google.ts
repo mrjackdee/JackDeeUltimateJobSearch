@@ -24,6 +24,12 @@ export async function driveClient() {
   return google.drive({ version: 'v3', auth: await googleAuth() });
 }
 
+export async function getFileMetadata(fileId: string) {
+  const drive = await driveClient();
+  const res = await drive.files.get({ fileId, fields: 'id,name,mimeType,webViewLink,modifiedTime,parents,size' });
+  return res.data;
+}
+
 export async function findFileByName(name: string, parentId: string, mimeType?: string) {
   const drive = await driveClient();
   const escaped = name.replace(/'/g, "\\'");
@@ -43,6 +49,17 @@ export async function ensureFolder(name: string, parentId: string): Promise<{ id
   });
   if (!created.data.id) throw new Error(`Unable to create Drive folder ${name}`);
   return { id: created.data.id, url: created.data.webViewLink ?? `https://drive.google.com/drive/folders/${created.data.id}` };
+}
+
+export async function copyFileToFolder(args: { fileId: string; name: string; parentId: string }): Promise<{ id: string; url: string }> {
+  const drive = await driveClient();
+  const copied = await drive.files.copy({
+    fileId: args.fileId,
+    requestBody: { name: args.name, parents: [args.parentId] },
+    fields: 'id,webViewLink',
+  });
+  if (!copied.data.id) throw new Error(`Unable to copy Drive file ${args.name}`);
+  return { id: copied.data.id, url: copied.data.webViewLink ?? `https://drive.google.com/open?id=${copied.data.id}` };
 }
 
 export async function uploadBuffer(args: {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { updateState } from '@/lib/storage/state';
+import { logAppIssue, plainUserError } from '@/lib/issues';
 import type { ApplicationStatus } from '@/lib/types';
 
 const allowed: ApplicationStatus[] = ['DISCOVERED','REVIEWING','PREPARING','READY_TO_APPLY','APPLIED','RECRUITER_CONTACT','INTERVIEW','FINAL_INTERVIEW','OFFER','REJECTED','WITHDRAWN','CLOSED','ARCHIVED'];
@@ -8,10 +9,10 @@ const allowed: ApplicationStatus[] = ['DISCOVERED','REVIEWING','PREPARING','READ
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const body = await request.json().catch(() => ({}));
-  if (!allowed.includes(body.status)) return NextResponse.json({ error: 'Invalid status.' }, { status: 400 });
+  if (!allowed.includes(body.status)) return NextResponse.json({ error: 'Choose one of the available application stages and try again.' }, { status: 400 });
   try {
     const app = await updateState(state => {
-      if (!state.jobs.some(j => j.id === id)) throw new Error('Job not found.');
+      if (!state.jobs.some(j => j.id === id)) throw new Error('This job is no longer available in your workspace.');
       let row = state.applications.find(a => a.jobId === id);
       if (!row) {
         row = { id: nanoid(), jobId: id, status: body.status, interviewDates: [], notes: [], updatedAt: new Date().toISOString() };
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
         row.dateApplied = new Date().toISOString();
         if (body.packageId) {
           const pkg = state.applicationPackages.find(p => p.id === body.packageId && p.jobId === id);
-          if (!pkg) throw new Error('Submitted application package not found.');
+          if (!pkg) throw new Error('The saved application materials for this job could not be found. Prepare them again, then mark the job as applied.');
           row.submittedApplicationPackageId = pkg.id;
           pkg.submitted = true;
           pkg.packageStatus = 'SUBMITTED';
@@ -37,5 +38,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       return row;
     });
     return NextResponse.json(app);
-  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Status update failed' }, { status: 500 }); }
+  } catch (error) {
+    const userMessage = plainUserError('The application stage could not be changed right now. Please try again.', error);
+    await logAppIssue({ area: 'Application tracking', action: 'Change an application stage', severity: 'ERROR', userMessage, technicalMessage: error instanceof Error ? error.stack ?? error.message : String(error), route: `/api/jobs/${id}/status`, statusCode: 500, resolved: false });
+    return NextResponse.json({ error: userMessage }, { status: 500 });
+  }
 }
