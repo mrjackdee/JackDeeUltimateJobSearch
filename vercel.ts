@@ -1,0 +1,21 @@
+export const config = {
+  framework: 'nextjs',
+  headers: [
+    {
+      source: '/(.*)',
+      headers: [
+        { key: 'X-Content-Type-Options', value: 'nosniff' },
+        { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        { key: 'X-Frame-Options', value: 'DENY' },
+        { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
+      ],
+    },
+  ],
+  crons: [
+    { path: '/api/cron/search', schedule: '0 11 * * 1-5' },
+    { path: '/api/cron/search', schedule: '0 12 * * 1-5' },
+    { path: '/api/cron/search', schedule: '0 20 * * 1-5' },
+    { path: '/api/cron/search', schedule: '0 21 * * 1-5' },
+  ],
+};
