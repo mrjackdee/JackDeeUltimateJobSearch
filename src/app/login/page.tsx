@@ -5,6 +5,7 @@ const LOGIN_ERRORS: Record<string,string> = {
   identity: 'Google did not return the account information the app needs. Please try again.',
   unverified: 'This Google account is not verified. Please use the approved verified account.',
   unauthorized: 'This Google account is not approved for this private workspace. Sign in with the authorized account instead.',
+  setup: 'Sign-in reached the app, but one of the connected Google services was not ready. Please try again. If it happens again, the app owner should review the Vercel runtime log.',
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
