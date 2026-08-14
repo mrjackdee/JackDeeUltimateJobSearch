@@ -28,6 +28,7 @@ jobs:
           base64 -d /tmp/app.tar.gz.b64 > /tmp/app.tar.gz
           tar -xzf /tmp/app.tar.gz -C .
           if [ -f bootstrap/typecheck-fixes.patch ]; then git apply bootstrap/typecheck-fixes.patch; fi
+          if [ -f bootstrap/lint-mobile-fixes.patch ]; then git apply bootstrap/lint-mobile-fixes.patch; fi
           rm -rf bootstrap
       - uses: actions/setup-node@v4
         if: steps.payload.outputs.present == 'true'
