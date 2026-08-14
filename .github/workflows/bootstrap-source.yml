@@ -27,6 +27,7 @@ jobs:
           cat final2/chunk_00 final2/chunk_01 final2/chunk_02 final2/chunk_03 final2/chunk_04 > /tmp/app.tar.gz.b64
           base64 -d /tmp/app.tar.gz.b64 > /tmp/app.tar.gz
           tar -xzf /tmp/app.tar.gz -C .
+          if [ -f final2/docx-fix.patch ]; then git apply final2/docx-fix.patch; fi
           rm -rf final final2
       - uses: actions/setup-node@v4
         if: steps.payload.outputs.mode == 'final2'
