@@ -30,6 +30,7 @@ jobs:
           if [ -f bootstrap/typecheck-fixes.patch ]; then git apply bootstrap/typecheck-fixes.patch; fi
           python3 bootstrap/remediate.py
           rm -rf bootstrap
+          rm -f .github/workflows/ci.yml .github/workflows/scheduled-search.yml
       - uses: actions/setup-node@v4
         if: steps.payload.outputs.present == 'true'
         with:
@@ -55,5 +56,5 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'feat: build production job search command center'
+          git commit -m 'feat: build validated job search command center source'
           git push origin HEAD:feature/production-job-search-command-center
