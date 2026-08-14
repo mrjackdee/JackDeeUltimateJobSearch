@@ -5,7 +5,7 @@ import { createDefaultState, defaultSettings } from '../default-state';
 import type { AppState } from '../types';
 import { findFileByName, googleConfigured, uploadBuffer, downloadFile } from './google';
 
-const STATE_FILE = '.jackdee-job-search-state.json';
+const STATE_FILE = '.rolebright-state.json';
 const localPath = path.join(process.cwd(), 'data', 'state.json');
 
 function shouldUseLocalStorage(): boolean {

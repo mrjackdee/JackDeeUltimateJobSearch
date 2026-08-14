@@ -1,4 +1,4 @@
-# Jack Dee Ultimate Job Search
+# RoleBright
 
 A mobile-first personal career operating system for Jack Darnell Givens. It discovers current roles, verifies listings, separates job records from analyses and application packages, scores fit and ATS alignment, manages overqualification risk, generates role-specific DOCX application materials, stores versioned packages in Google Drive, and tracks each candidacy through outcome.
 
@@ -27,12 +27,12 @@ The configured search windows are 7:00 AM and 4:00 PM America/New_York on weekda
 
 ## Google Drive
 
-The app uses the existing private folder structure under **Jack Dee Ultimate Job Search Tool**. Production access uses a dedicated Google service account so scheduled server-side jobs do not depend on a browser session or expose a personal OAuth token.
+The app uses the existing private folder structure under **RoleBright**. Production access uses a dedicated Google service account so scheduled server-side jobs do not depend on a browser session or expose a personal OAuth token.
 
 Required setup:
 
 1. Create a Google Cloud service account with Drive API access.
-2. Share the `Jack Dee Ultimate Job Search Tool` folder with the service-account email as Editor.
+2. Share the `RoleBright` folder with the service-account email as Editor.
 3. Set `GOOGLE_SERVICE_ACCOUNT_EMAIL` and `GOOGLE_PRIVATE_KEY` in Vercel.
 4. Keep the provided folder IDs in the Vercel environment variables.
 

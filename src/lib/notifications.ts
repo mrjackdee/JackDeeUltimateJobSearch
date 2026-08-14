@@ -20,7 +20,7 @@ async function gmailClient() {
 function encodeMessage(subject: string, html: string) {
   const message = [
     `To: ${TO}`,
-    `From: Jack Dee Job Search Command Center <${TO}>`,
+    `From: RoleBright <${TO}>`,
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
     'Content-Type: text/html; charset=UTF-8',

@@ -24,7 +24,7 @@ export default function LoginGateway({ errorMessage }: { errorMessage?: string }
 
   return <div className={styles.gateway}>
     <div className={styles.grid} aria-hidden="true"/><div className={styles.glowOne} aria-hidden="true"/><div className={styles.glowTwo} aria-hidden="true"/>
-    <header className={styles.header}><div className={styles.brand}><span className={styles.brandMark}>JD</span><div><strong>Job Search Command Center</strong><span>Private career workspace</span></div></div><div className={styles.secureBadge}><ShieldCheck size={15}/> Private & secure</div></header>
+    <header className={styles.header}><div className={styles.brand}><span className={styles.brandMark}>RB</span><div><strong>RoleBright</strong><span>Private career workspace</span></div></div><div className={styles.secureBadge}><ShieldCheck size={15}/> Private & secure</div></header>
     <main className={styles.main}>
       <section className={styles.copyColumn}>
         <motion.div initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} transition={{duration:.5}} className={styles.eyebrow}><span className={styles.liveDot}/><BrainCircuit size={15}/>Your private AI-powered job search workspace</motion.div>
@@ -46,6 +46,6 @@ export default function LoginGateway({ errorMessage }: { errorMessage?: string }
         <div className={styles.floatingCardOne}><span>Applications ready</span><strong>3</strong></div><div className={styles.floatingCardTwo}><span>Strong matches</span><strong>7</strong></div>
       </motion.section>
     </main>
-    <footer className={styles.footer}><span>Jack Dee Career Intelligence</span><span>Private by design</span></footer>
+    <footer className={styles.footer}><span>RoleBright Career Intelligence</span><span>Private by design</span></footer>
   </div>;
 }
