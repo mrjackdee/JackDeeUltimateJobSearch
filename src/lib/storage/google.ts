@@ -2,19 +2,30 @@ import 'server-only';
 import { google } from 'googleapis';
 import { Readable } from 'node:stream';
 
+function oauthCredentials() {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_USER_REFRESH_TOKEN;
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error('Google user OAuth Drive credentials are not configured.');
+  }
+  return { clientId, clientSecret, refreshToken };
+}
+
 export function googleConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY && process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID);
+  return Boolean(
+    process.env.GOOGLE_OAUTH_CLIENT_ID &&
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET &&
+    process.env.GOOGLE_USER_REFRESH_TOKEN &&
+    process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID
+  );
 }
 
 export function googleAuth() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-  if (!email || !privateKey) throw new Error('Google service-account credentials are not configured.');
-  return new google.auth.JWT({
-    email,
-    key: privateKey,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
+  const { clientId, clientSecret, refreshToken } = oauthCredentials();
+  const auth = new google.auth.OAuth2(clientId, clientSecret);
+  auth.setCredentials({ refresh_token: refreshToken });
+  return auth;
 }
 
 export function driveClient() {
