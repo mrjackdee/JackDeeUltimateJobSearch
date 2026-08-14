@@ -30,6 +30,7 @@ export function createDefaultState(): AppState {
     masterResumes: structuredClone(defaultMasterResumes),
     searchRuns: [],
     settings: { ...defaultSettings },
+    notificationsEnabled: true,
     updatedAt: new Date().toISOString(),
   };
 }

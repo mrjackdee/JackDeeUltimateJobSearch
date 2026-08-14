@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpRight, BriefcaseBusiness, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowUpRight, BriefcaseBusiness, FolderOpen, RefreshCw, Sparkles } from 'lucide-react';
 import type { Analysis, Application, ApplicationPackage, Job, SearchLane, SearchRun, SearchSettings } from '@/lib/types';
 import { salaryText } from '@/lib/utils';
 
@@ -34,6 +34,10 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile }
   const interviews = rows.filter(r => ['INTERVIEW','FINAL_INTERVIEW'].includes(r.application?.status ?? '')).length;
   const followups = rows.filter(r => r.application?.followUpDate && r.application.followUpDate.slice(0,10) <= today).length;
   const high = rows.filter(r => (r.analysis?.overallFitScore ?? 0) >= settings.autoPrepareThreshold).length;
+  const phases = [
+    ['DISCOVERED','Discovered'],['REVIEWING','Review'],['PREPARING','Preparing'],['READY_TO_APPLY','Ready'],['APPLIED','Applied'],['RECRUITER_CONTACT','Recruiter'],['INTERVIEW','Interview'],['FINAL_INTERVIEW','Final'],['OFFER','Offer'],['CLOSED','Closed']
+  ] as const;
+
 
   async function runSearch() {
     setMessage('');
@@ -79,6 +83,11 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile }
       <div className="stat"><div className="stat-value">{followups}</div><div className="stat-label">Follow-ups due</div></div>
     </section>
 
+    <section aria-labelledby="pipeline-title">
+      <div className="section-head"><div><div className="eyebrow">Process dashboard</div><h2 id="pipeline-title">Application pipeline</h2></div><Link className="inline-link" href="/applications">View all</Link></div>
+      <div className="pipeline-grid">{phases.map(([status,label]) => { const phaseRows = rows.filter(r => (r.application?.status ?? 'DISCOVERED') === status); const latest = phaseRows[0]; const pkg = latest?.packages.filter(p=>!p.superseded).sort((a,b)=>b.version-a.version)[0]; return <article className="pipeline-card" key={status}><Link href={`/applications?status=${status}`} className="pipeline-card-main"><span>{label}</span><strong>{phaseRows.length}</strong></Link>{latest && <div className="pipeline-latest"><Link href={`/jobs/${latest.job.id}`}>{latest.job.company}<br/><b>{latest.job.title}</b></Link>{pkg && <div className="pipeline-doc-links">{pkg.googleDriveFolderUrl && <a href={pkg.googleDriveFolderUrl} target="_blank" rel="noreferrer" className="drive-link"><FolderOpen size={14}/>Folder</a>}{pkg.resumeUrl && <a href={pkg.resumeUrl} target="_blank" rel="noreferrer" className="drive-link">Resume</a>}{pkg.coverLetterUrl && <a href={pkg.coverLetterUrl} target="_blank" rel="noreferrer" className="drive-link">Letter</a>}</div>}</div>}</article>; })}</div>
+    </section>
+
     <section className="toolbar" aria-label="Job filters">
       <input className="search-input" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search company, role, or location" aria-label="Search opportunities"/>
       <div className="filters">
@@ -102,8 +111,24 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile }
         <Link className="button subtle" href={`/jobs/${row.job.id}`}>View Analysis</Link>
         {(row.analysis?.overallFitScore ?? 0) >= 80 && !row.packages.some(p => p.packageStatus === 'READY_TO_APPLY') && <button className="button accent" disabled={isPending} onClick={() => prepare(row.job.id)}><Sparkles size={15}/>Prepare</button>}
         <a className="button" href={row.job.applicationUrl} target="_blank" rel="noreferrer">Employer Post <ArrowUpRight size={14}/></a>
+        {row.packages.filter(p=>!p.superseded).sort((a,b)=>b.version-a.version)[0]?.googleDriveFolderUrl && <a className="button" href={row.packages.filter(p=>!p.superseded).sort((a,b)=>b.version-a.version)[0].googleDriveFolderUrl} target="_blank" rel="noreferrer"><FolderOpen size={14}/>Drive Package</a>}
       </div>
     </article>)}</div> : <div className="empty">No qualifying opportunities match the current filters. Run a search, sync the career profile, or import a job directly.</div>}
+
+    <section className="about-card" aria-labelledby="about-me-title">
+      <div className="about-photo-wrap">
+        <img src="/jack-dee-profile.jpg" alt="Jack Dee" className="about-photo" />
+      </div>
+      <div className="about-copy">
+        <div className="eyebrow">About Me</div>
+        <h2 id="about-me-title">Jack Dee</h2>
+        <p>This private command center supports my search, application preparation, document management, and career tracking in one secure workspace.</p>
+        <div className="about-links">
+          <a className="button primary" href="https://www.donoraglobal.com" target="_blank" rel="noreferrer">DonOra Global <ArrowUpRight size={14}/></a>
+          <a className="inline-link" href="https://www.donoraglobal.com" target="_blank" rel="noreferrer">www.donoraglobal.com</a>
+        </div>
+      </div>
+    </section>
 
     {searchRuns[0] && <div className="section-head"><p>Last search: {new Date(searchRuns[0].completedAt ?? searchRuns[0].startedAt).toLocaleString()} · {searchRuns[0].qualified} qualified · {searchRuns[0].duplicates} duplicates suppressed</p></div>}
   </>;

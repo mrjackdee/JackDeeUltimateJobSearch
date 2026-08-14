@@ -6,6 +6,7 @@ import { interpretAnalysis } from './ai';
 import { getState, updateState } from './storage/state';
 import type { Analysis, Job, SearchRun } from './types';
 import { daysOld, fingerprint, normalizeText } from './utils';
+import { notifySearchSummary } from './notifications';
 
 function semanticKey(job: Job) {
   return `${normalizeText(job.company)}|${normalizeText(job.title)}|${normalizeText(job.location)}`;
@@ -83,5 +84,6 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
     current.searchRuns.unshift(run);
     current.searchRuns = current.searchRuns.slice(0, 100);
   });
+  if (state.notificationsEnabled !== false) { try { const qualifiedJobs = verified.filter(j => analyses.some(a => a.jobId === j.id)).sort((a,b) => (analyses.find(x=>x.jobId===b.id)?.overallFitScore ?? 0) - (analyses.find(x=>x.jobId===a.id)?.overallFitScore ?? 0)); await notifySearchSummary(run, qualifiedJobs); } catch (error) { console.warn('Search notification failed', error instanceof Error ? error.message : error); } }
   return run;
 }

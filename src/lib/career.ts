@@ -81,3 +81,10 @@ export async function getMasterResumeText(masterName: string): Promise<{ id: str
   if (!preferred?.id || !preferred.name) throw new Error('No master resume is available.');
   return { id: preferred.id, name: preferred.name, text: await extractResumeText(preferred.id) };
 }
+
+export async function getMasterResumeById(masterId: string): Promise<{ id: string; name: string; text: string }> {
+  const state = await import('./storage/state').then(m => m.getState());
+  const master = state.masterResumes.find(r => r.id === masterId);
+  if (!master?.googleDriveFileId) throw new Error('Selected baseline resume is not available in Google Drive.');
+  return { id: master.googleDriveFileId, name: master.name, text: await extractResumeText(master.googleDriveFileId) };
+}

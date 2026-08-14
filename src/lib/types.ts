@@ -187,7 +187,9 @@ export interface MasterResume {
   googleDriveUrl?: string;
   status: 'APPROVED' | 'GENERATED_DRAFT' | 'MISSING';
   lastUpdated?: string;
+  isBaseline?: boolean;
 }
+
 
 export interface SearchRun {
   id: string;
@@ -223,6 +225,8 @@ export interface AppState {
   masterResumes: MasterResume[];
   searchRuns: SearchRun[];
   settings: SearchSettings;
+  baselineResumeId?: string;
+  notificationsEnabled?: boolean;
   updatedAt: string;
 }
 

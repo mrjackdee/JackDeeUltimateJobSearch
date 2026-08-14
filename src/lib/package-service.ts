@@ -3,10 +3,11 @@ import { nanoid } from 'nanoid';
 import type { Analysis, ApplicationPackage, CoverLetterContent, Job } from './types';
 import { getState, updateState } from './storage/state';
 import { generateCoverLetter, tailorResume } from './ai';
-import { getMasterResumeText } from './career';
+import { getMasterResumeText, getMasterResumeById } from './career';
 import { analysisDocx, coverLetterDocx, jobDescriptionDocx, resumeDocx } from './documents/docx';
 import { ensureFolder, uploadBuffer, findFileByName } from './storage/google';
 import { safeFilePart, normalizeText, clamp } from './utils';
+import { notifyApplicationPackage } from './notifications';
 
 function latestAnalysis(analyses: Analysis[], jobId: string): Analysis | undefined {
   return analyses.filter(a => a.jobId === jobId).sort((a, b) => b.analysisDate.localeCompare(a.analysisDate))[0];
@@ -48,7 +49,7 @@ export async function prepareApplication(jobId: string, forceNewVersion = false)
     if (ready) return ready;
   }
   const version = (existing[0]?.version ?? 0) + 1;
-  const master = await getMasterResumeText(analysis.recommendedMasterResume);
+  const master = state.baselineResumeId ? await getMasterResumeById(state.baselineResumeId) : await getMasterResumeText(analysis.recommendedMasterResume);
   const tailored = await tailorResume({ job, profile: state.careerProfile, masterResumeText: master.text, analysis });
   const cover = await generateCoverLetter({ job, profile: state.careerProfile, resume: tailored });
   const resumeText = JSON.stringify(tailored);
@@ -56,7 +57,7 @@ export async function prepareApplication(jobId: string, forceNewVersion = false)
   const failures = qa(job, tailored, cover, atsScoreAfter);
 
   const resumeBuffer = await resumeDocx(tailored);
-  const coverBuffer = await coverLetterDocx(cover, tailored.candidateName);
+  const coverBuffer = await coverLetterDocx(cover, tailored.candidateName, tailored.contactLine, job);
   const jdBuffer = await jobDescriptionDocx(job);
   const analysisBuffer = await analysisDocx(job, analysis);
 
@@ -120,5 +121,6 @@ export async function prepareApplication(jobId: string, forceNewVersion = false)
   });
 
   if (failures.length) throw new Error(`Application package QA failed: ${failures.join(' ')}`);
+  if (state.notificationsEnabled !== false) { try { await notifyApplicationPackage(job, pkg); } catch (error) { console.warn('Application notification failed', error instanceof Error ? error.message : error); } }
   return pkg;
 }
