@@ -27,6 +27,7 @@ jobs:
           cat bootstrap/chunk_00 bootstrap/chunk_01 bootstrap/chunk_02 bootstrap/chunk_03 bootstrap/chunk_04 > /tmp/app.tar.gz.b64
           base64 -d /tmp/app.tar.gz.b64 > /tmp/app.tar.gz
           tar -xzf /tmp/app.tar.gz -C .
+          if [ -f bootstrap/typecheck-fixes.patch ]; then git apply bootstrap/typecheck-fixes.patch; fi
           rm -rf bootstrap
       - uses: actions/setup-node@v4
         if: steps.payload.outputs.present == 'true'
