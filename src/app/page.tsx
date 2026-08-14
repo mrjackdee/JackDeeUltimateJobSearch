@@ -1,4 +1,5 @@
 import { getState } from '@/lib/storage/state';
+import { contactsFromState, networkOpportunity } from '@/lib/network';
 import { DashboardClient } from '@/components/DashboardClient';
 import type { WorkflowStatus } from '@/components/WorkflowGuide';
 
@@ -6,11 +7,18 @@ export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const state = await getState();
+  const contacts = contactsFromState(state);
   const latestAnalysisByJob = new Map<string, typeof state.analyses[number]>();
   for (const a of state.analyses) { const old = latestAnalysisByJob.get(a.jobId); if (!old || a.analysisDate > old.analysisDate) latestAnalysisByJob.set(a.jobId, a); }
   const rows = state.jobs
     .filter(j => j.active && j.resultStatus !== 'REJECTED_BY_USER' && ['ACTIVE_VERIFIED','ACTIVE_LIKELY'].includes(j.verificationStatus))
-    .map(job => ({ job, analysis: latestAnalysisByJob.get(job.id), application: state.applications.find(a => a.jobId === job.id), packages: state.applicationPackages.filter(p => p.jobId === job.id) }))
+    .map(job => ({
+      job,
+      analysis: latestAnalysisByJob.get(job.id),
+      application: state.applications.find(a => a.jobId === job.id),
+      packages: state.applicationPackages.filter(p => p.jobId === job.id),
+      networkOpportunity: networkOpportunity(job.company, contacts).label,
+    }))
     .filter(row => row.analysis && !row.analysis.disqualified && (row.analysis.overallFitScore >= state.settings.fitThreshold || (state.settings.showStretchRoles && row.analysis.overallFitScore >= 70)))
     .sort((a,b) => (b.analysis?.priorityScore ?? 0) - (a.analysis?.priorityScore ?? 0));
 
