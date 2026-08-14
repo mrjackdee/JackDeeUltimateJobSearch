@@ -1,0 +1,10 @@
+--- a/src/components/DashboardClient.tsx
++++ b/src/components/DashboardClient.tsx
+@@ -75,7 +75,7 @@
+ 
+     <section className="stats" aria-label="Daily summary">
+-      <div className="stat"><div className="stat-value">{newToday}</div><div className="stat-label">Today's new jobs</div></div>
++      <div className="stat"><div className="stat-value">{newToday}</div><div className="stat-label">Today&apos;s new jobs</div></div>
+       <div className="stat"><div className="stat-value">{applyNow}</div><div className="stat-label">Apply now</div></div>
+       <div className="stat"><div className="stat-value">{high}</div><div className="stat-label">90+ matches</div></div>
+       <div className="stat"><div className="stat-value">{ready}</div><div className="stat-label">Applications ready</div></div>
