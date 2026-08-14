@@ -1,6 +1,6 @@
 import 'server-only';
 import mammoth from 'mammoth';
-import pdf from 'pdf-parse';
+import { PDFParse } from 'pdf-parse';
 import { buildCareerEvidenceProfile } from './ai';
 import { listFolder, downloadFile, findFileByName, getFileMetadata } from './storage/google';
 import { updateState } from './storage/state';
@@ -36,8 +36,13 @@ export async function extractResumeText(fileId: string): Promise<string> {
   const bytes = await downloadFile(fileId);
 
   if (mime === PDF_MIME) {
-    const result = await pdf(bytes);
-    return result.text.replace(/\n{3,}/g, '\n\n').trim();
+    const parser = new PDFParse({ data: bytes });
+    try {
+      const result = await parser.getText();
+      return result.text.replace(/\n{3,}/g, '\n\n').trim();
+    } finally {
+      await parser.destroy();
+    }
   }
 
   if (mime === DOCX_MIME || mime === GOOGLE_DOC_MIME) {
