@@ -59,7 +59,7 @@ export default function HeroSection({
   }
 
   return (
-    <section className={styles.hero} aria-labelledby="hero-title">
+    <section id="job-search" className={styles.hero} aria-labelledby="hero-title">
       <div className={styles.grid} aria-hidden="true" />
       <div className={styles.glow} aria-hidden="true" />
 
