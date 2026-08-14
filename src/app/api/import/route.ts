@@ -7,6 +7,7 @@ import { verifyListing } from '@/lib/job-sources';
 import { deterministicAnalysis, passesHardFilters } from '@/lib/scoring';
 import { interpretAnalysis } from '@/lib/ai';
 import { getState, updateState } from '@/lib/storage/state';
+import { logAppIssue, plainUserError } from '@/lib/issues';
 
 function arrangement(text: string): WorkArrangement {
   const t = text.toLowerCase();
@@ -32,7 +33,7 @@ function parseJobPosting(html: string, url: string): Partial<Job> {
       const parsed = JSON.parse($(el).text());
       const list = Array.isArray(parsed) ? parsed : parsed['@graph'] ? parsed['@graph'] : [parsed];
       data = list.find((x: any) => x?.['@type'] === 'JobPosting') ?? data;
-    } catch { /* ignore invalid JSON-LD */ }
+    } catch { /* ignore unreadable embedded job data */ }
   });
   const title = String(data?.title ?? $('h1').first().text() ?? '').trim();
   const company = String(data?.hiringOrganization?.name ?? $('meta[property="og:site_name"]').attr('content') ?? '').trim();
@@ -63,15 +64,15 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     let partial: Partial<Job> = {};
-    let source = 'Manual Import';
+    let source = 'Added manually';
     if (body.url) {
       const res = await fetch(String(body.url), { redirect: 'follow', headers: { 'User-Agent': 'Mozilla/5.0 JackDeeJobSearch/1.0' }, signal: AbortSignal.timeout(15000) });
-      if (!res.ok) throw new Error(`Unable to fetch job URL (${res.status}).`);
+      if (!res.ok) throw new Error('The employer page could not be opened. Paste the job details into the form and try again.');
       partial = parseJobPosting(await res.text(), String(body.url));
       source = new URL(String(body.url)).hostname;
     }
     partial = { ...partial, ...Object.fromEntries(Object.entries({ title: body.title, company: body.company, description: body.description, location: body.location, applicationUrl: body.url }).filter(([,v]) => v)) };
-    if (!partial.title || !partial.company || !partial.description || !partial.applicationUrl) throw new Error('Job title, company, description, and URL are required or must be discoverable from the posting.');
+    if (!partial.title || !partial.company || !partial.description || !partial.applicationUrl) throw new Error('The app still needs the job title, company, job description, and employer link. Add the missing details and try again.');
     const job: Job = {
       id: nanoid(), title: partial.title, company: partial.company, applicationUrl: partial.applicationUrl,
       sourceUrl: partial.sourceUrl ?? partial.applicationUrl, description: partial.description, location: partial.location ?? 'Unknown',
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
     if (!hard.pass) return NextResponse.json({ job: verified, excluded: true, reasons: hard.reasons });
     let analysis = state.careerProfile ? deterministicAnalysis(verified, state.careerProfile) : undefined;
     if (analysis && analysis.overallFitScore >= state.settings.fitThreshold) {
-      try { analysis = await interpretAnalysis(verified, state.careerProfile!, analysis); } catch { /* deterministic analysis remains */ }
+      try { analysis = await interpretAnalysis(verified, state.careerProfile!, analysis); } catch { /* keep the basic match review */ }
     }
     await updateState(current => {
       if (!current.jobs.some(j => j.duplicateFingerprint === verified.duplicateFingerprint)) current.jobs.push(verified);
@@ -95,5 +96,9 @@ export async function POST(request: NextRequest) {
       current.searchRuns.unshift({ id: nanoid(), startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), trigger: 'IMPORT', discovered: 1, qualified: analysis?.overallFitScore && analysis.overallFitScore >= current.settings.fitThreshold ? 1 : 0, excluded: 0, inactive: 0, duplicates: 0, errors: [] });
     });
     return NextResponse.json({ job: verified, analysis });
-  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Import failed' }, { status: 500 }); }
+  } catch (error) {
+    const userMessage = plainUserError('The job could not be added right now. Check the employer link and any information you entered, then try again.', error);
+    await logAppIssue({ area: 'Add a job', action: 'Add and review a job posting', severity: 'ERROR', userMessage, technicalMessage: error instanceof Error ? error.stack ?? error.message : String(error), route: '/api/import', statusCode: 500, resolved: false });
+    return NextResponse.json({ error: userMessage }, { status: 500 });
+  }
 }
