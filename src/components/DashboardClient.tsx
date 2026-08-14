@@ -10,7 +10,7 @@ import { WorkflowGuide, type WorkflowStatus } from '@/components/WorkflowGuide';
 import type { Analysis, Application, ApplicationPackage, Job, SearchLane, SearchRun, SearchSettings } from '@/lib/types';
 import { salaryText } from '@/lib/utils';
 
-type Row = { job: Job; analysis?: Analysis; application?: Application; packages: ApplicationPackage[] };
+type Row = { job: Job; analysis?: Analysis; application?: Application; packages: ApplicationPackage[]; networkOpportunity?: string };
 
 const laneLabels: Record<SearchLane, string> = { EXECUTIVE: 'Executive', PROGRAM_PROJECT: 'Project + Program', AGILE: 'Agile', PRODUCT: 'Product' };
 
@@ -153,6 +153,7 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile, 
         <span className={`badge ${row.job.verificationStatus === 'ACTIVE_VERIFIED' ? 'good' : 'warn'}`}>{verificationLabel(row.job.verificationStatus)}</span>
         {row.analysis?.compensationLabel && <span className="badge">Comp: {row.analysis.compensationLabel.replaceAll('_',' ')}</span>}
         {row.analysis?.compensationRisk && <span className="badge warn">Compensation risk</span>}
+        {row.networkOpportunity && row.networkOpportunity !== 'No Known Connection' && <Link href="/network" className="badge good">NETWORK OPPORTUNITY: {row.networkOpportunity}</Link>}
       </div>
       <p className="fit">{fitCopy(row)}</p>
       <div className="evidence-preview"><span>Resume competitiveness</span><strong>{competitivenessLabel(row.analysis?.resumeCompetitiveness)}</strong></div>
