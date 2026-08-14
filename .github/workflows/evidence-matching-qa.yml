@@ -1,0 +1,29 @@
+name: Evidence Matching QA
+
+on:
+  push:
+    branches:
+      - feature/evidence-based-matching
+  workflow_dispatch:
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install packages
+        run: npm ci --legacy-peer-deps --no-audit --no-fund
+      - name: Type check
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Automated tests
+        run: npm run test
+      - name: Production build
+        run: npm run build
