@@ -28,7 +28,9 @@ jobs:
           base64 -d /tmp/app.tar.gz.b64 > /tmp/app.tar.gz
           tar -xzf /tmp/app.tar.gz -C .
           if [ -f final2/docx-fix.patch ]; then git apply final2/docx-fix.patch; fi
+          if [ -f lint-fix.patch ]; then git apply lint-fix.patch; fi
           rm -rf final final2
+          rm -f lint-fix.patch
       - uses: actions/setup-node@v4
         if: steps.payload.outputs.mode == 'final2'
         with:
