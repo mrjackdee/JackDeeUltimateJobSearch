@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio';
 import { nanoid } from 'nanoid';
 import { fingerprint, parseSalary } from '@/lib/utils';
 import type { Job, SearchLane, WorkArrangement } from '@/lib/types';
-import { verifyListing } from '@/lib/job-sources';
+import { enrichAndVerifyListing } from '@/lib/listing-enrichment';
 import { basicEligibility, evidenceBasedAnalysis, validateHighScore } from '@/lib/ai/matching';
 import { specializedDomainMismatch } from '@/lib/domain-guard';
 import { getState, updateState } from '@/lib/storage/state';
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       searchLane: lane(partial.title), verificationStatus: 'STATUS_UNCERTAIN', repost: false, resultStatus: 'NEW',
       duplicateFingerprint: fingerprint([partial.company, partial.title, partial.location, partial.externalId, partial.requisitionNumber, partial.applicationUrl]), active: true,
     };
-    const verified = await verifyListing(job);
+    const verified = await enrichAndVerifyListing(job);
     const state = await getState();
     const eligibility = basicEligibility(verified, state.settings);
     if (!eligibility.pass) return NextResponse.json({ job: verified, excluded: true, reasons: eligibility.reasons });
