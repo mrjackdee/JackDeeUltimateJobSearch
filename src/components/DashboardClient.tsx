@@ -5,6 +5,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowUpRight, FolderOpen, Sparkles } from 'lucide-react';
 import HeroSection from '@/components/HeroSection';
+import { JobDecisionButtons } from '@/components/JobDecisionButtons';
 import { WorkflowGuide, type WorkflowStatus } from '@/components/WorkflowGuide';
 import type { Analysis, Application, ApplicationPackage, Job, SearchLane, SearchRun, SearchSettings } from '@/lib/types';
 import { salaryText } from '@/lib/utils';
@@ -46,6 +47,8 @@ function competitivenessLabel(value?: Analysis['resumeCompetitiveness']) {
 
 function resultStatus(row: Row) {
   if (row.job.resultStatus === 'UPDATED') return 'UPDATED';
+  if (row.job.resultStatus === 'SAVED') return 'SAVED';
+  if (row.job.resultStatus === 'REJECTED_BY_USER') return 'REJECTED BY USER';
   if (row.application?.status === 'APPLIED') return 'APPLIED';
   if (['INTERVIEW','FINAL_INTERVIEW'].includes(row.application?.status ?? '')) return 'INTERVIEWING';
   return row.job.resultStatus ?? 'NEW';
@@ -80,15 +83,16 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile, 
     const laneMatches = lane === 'ALL' || r.job.searchLane === lane;
     const roleMatches = !normalize(query) || normalize(`${r.job.title} ${r.job.company}`).includes(normalize(query));
     const locationMatches = !normalize(locationQuery) || normalize(`${r.job.location} ${r.job.workArrangement}`).includes(normalize(locationQuery));
-    return laneMatches && roleMatches && locationMatches;
+    const notRejected = r.job.resultStatus !== 'REJECTED_BY_USER';
+    return laneMatches && roleMatches && locationMatches && notRejected;
   }).sort((a,b) => (b.analysis?.priorityScore ?? 0) - (a.analysis?.priorityScore ?? 0) || (b.analysis?.overallFitScore ?? 0) - (a.analysis?.overallFitScore ?? 0)), [rows, lane, query, locationQuery]);
   const today = new Date().toISOString().slice(0,10);
-  const newToday = rows.filter(r => r.job.dateDiscovered.startsWith(today)).length;
-  const applyNow = rows.filter(r => r.analysis?.priorityRecommendation === 'APPLY_NOW').length;
+  const newToday = rows.filter(r => r.job.dateDiscovered.startsWith(today) && r.job.resultStatus !== 'REJECTED_BY_USER').length;
+  const applyNow = rows.filter(r => r.analysis?.priorityRecommendation === 'APPLY_NOW' && r.job.resultStatus !== 'REJECTED_BY_USER').length;
   const ready = rows.filter(r => r.packages.some(p => p.packageStatus === 'READY_TO_APPLY')).length;
   const interviews = rows.filter(r => ['INTERVIEW','FINAL_INTERVIEW'].includes(r.application?.status ?? '')).length;
   const followups = rows.filter(r => r.application?.followUpDate && r.application.followUpDate.slice(0,10) <= today).length;
-  const high = rows.filter(r => (r.analysis?.overallFitScore ?? 0) >= settings.autoPrepareThreshold).length;
+  const high = rows.filter(r => (r.analysis?.overallFitScore ?? 0) >= settings.autoPrepareThreshold && r.job.resultStatus !== 'REJECTED_BY_USER').length;
   const phases = [
     ['DISCOVERED','Found'],['REVIEWING','Reviewing'],['PREPARING','Preparing'],['READY_TO_APPLY','Ready'],['APPLIED','Applied'],['RECRUITER_CONTACT','Recruiter'],['INTERVIEW','Interview'],['FINAL_INTERVIEW','Final'],['OFFER','Offer'],['CLOSED','Closed']
   ] as const;
@@ -137,7 +141,7 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile, 
 
     <div className="section-head"><div><div className="eyebrow">Evidence-based recommendations</div><h2>Jobs worth your time</h2></div><p>{visible.length} shown</p></div>
     {visible.length ? <div className="job-grid">{visible.map(row => <article className="job-card" key={row.job.id}>
-      <div className="job-card-statusline"><span className={`badge ${resultStatus(row)==='NEW'?'good':'warn'}`}>{resultStatus(row).replaceAll('_',' ')}</span>{row.analysis?.priorityRecommendation && <span className="badge">{row.analysis.priorityRecommendation.replaceAll('_',' ')}</span>}</div>
+      <div className="job-card-statusline"><span className={`badge ${resultStatus(row)==='NEW'?'good':'warn'}`}>{resultStatus(row)}</span>{row.analysis?.priorityRecommendation && <span className="badge">{row.analysis.priorityRecommendation.replaceAll('_',' ')}</span>}</div>
       <div className="job-head"><div><h3 className="job-title">{row.job.title}</h3><div className="company">{row.job.company}</div></div><div className="score" aria-label={`Match score ${row.analysis?.overallFitScore ?? 0} out of 100`}>{row.analysis?.overallFitScore ?? '—'}</div></div>
       <div className="match-summary-row"><strong>{row.analysis?.matchLabel ?? 'Not reviewed'}</strong><span>Confidence: {confidenceLabel(row.analysis?.matchConfidence).replace(' confidence','')}</span><span>Priority: {row.analysis?.priorityScore ?? '—'}/100</span></div>
       <div className="meta">
@@ -155,6 +159,7 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile, 
       {row.analysis?.gapDetails?.length ? <div className="risk-preview"><strong>Top risk:</strong> {row.analysis.gapDetails[0].explanation}</div> : null}
       <div className="card-actions">
         <Link className="button subtle" href={`/jobs/${row.job.id}`}>View Analysis</Link>
+        <JobDecisionButtons jobId={row.job.id} status={row.job.resultStatus}/>
         {(row.analysis?.overallFitScore ?? 0) >= 80 && !row.analysis?.disqualified && !row.packages.some(p => p.packageStatus === 'READY_TO_APPLY') && <button className="button accent" disabled={isPending} onClick={() => prepare(row.job.id)}><Sparkles size={15}/>Prepare materials</button>}
         <a className="button" href={row.job.applicationUrl} target="_blank" rel="noreferrer">Apply / View Posting <ArrowUpRight size={14}/></a>
         {row.packages.filter(p=>!p.superseded).sort((a,b)=>b.version-a.version)[0]?.googleDriveFolderUrl && <a className="button" href={row.packages.filter(p=>!p.superseded).sort((a,b)=>b.version-a.version)[0].googleDriveFolderUrl} target="_blank" rel="noreferrer"><FolderOpen size={14}/>Open saved materials</a>}
