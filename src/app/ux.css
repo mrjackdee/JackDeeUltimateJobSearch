@@ -12,6 +12,8 @@
 .card-actions .button { width: fit-content; }
 .about-links .button { width: fit-content; }
 .logout-button { min-height: 38px; padding: 8px 10px; font-size: 11px; }
+button[class*="searchButton"] { width: fit-content !important; justify-self: end; }
+a[class*="loginButton"] { width: fit-content !important; max-width: 100%; }
 
 .settings-steps {
   margin: 14px 0 4px;
@@ -104,6 +106,8 @@
   .hero-actions .button,
   .card-actions .button,
   .about-links .button { width: fit-content; }
+  button[class*="searchButton"] { width: fit-content !important; justify-self: end; }
+  a[class*="loginButton"] { width: fit-content !important; }
   .workflow-step { grid-template-columns: 34px minmax(0,1fr); padding: 14px; }
   .admin-log-heading time { width: 100%; margin-left: 0; }
 }
