@@ -40,11 +40,11 @@ function qualifiesForDisplay(analysis: Analysis, fitThreshold: number, showStret
 
 export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRun> {
   const run: SearchRun = { id: nanoid(), startedAt: new Date().toISOString(), trigger, discovered: 0, qualified: 0, excluded: 0, inactive: 0, duplicates: 0, errors: [] };
-  const { jobs: discovered, errors } = await discoverAll();
+  const state = await getState();
+  const { jobs: discovered, errors } = await discoverAll(state.settings.targetCompanies ?? []);
   run.errors.push(...errors);
   run.discovered = discovered.length;
 
-  const state = await getState();
   const existingByFingerprint = new Map(state.jobs.map(j => [j.duplicateFingerprint, j]));
   const existingBySemantic = new Map(state.jobs.map(j => [semanticKey(j), j]));
   const candidateMap = new Map<string, Job>();
