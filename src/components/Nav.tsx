@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BriefcaseBusiness, ClipboardCheck, ListChecks, Settings } from 'lucide-react';
+import { BriefcaseBusiness, ClipboardCheck, ListChecks, Settings, Users } from 'lucide-react';
 
 export function Nav() {
   const pathname = usePathname();
@@ -10,6 +10,7 @@ export function Nav() {
     { href: '/', label: 'Home', icon: BriefcaseBusiness },
     { href: '/guide', label: 'Workflow', icon: ListChecks },
     { href: '/applications', label: 'Applications', icon: ClipboardCheck },
+    { href: '/network', label: 'Network', icon: Users },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
