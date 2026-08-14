@@ -12,49 +12,58 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check bootstrap payload
+      - name: Detect source package
         id: payload
         shell: bash
         run: |
-          if [ -f bootstrap/chunk_00 ] && [ -f bootstrap/chunk_01 ] && [ -f bootstrap/chunk_02 ] && [ -f bootstrap/chunk_03 ] && [ -f bootstrap/chunk_04 ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
+          if [ -f final/chunk_00 ] && [ -f final/chunk_01 ]; then
+            echo "mode=final" >> "$GITHUB_OUTPUT"
+          elif [ -f bootstrap/chunk_00 ] && [ -f bootstrap/chunk_01 ] && [ -f bootstrap/chunk_02 ] && [ -f bootstrap/chunk_03 ] && [ -f bootstrap/chunk_04 ]; then
+            echo "mode=bootstrap" >> "$GITHUB_OUTPUT"
           else
-            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "mode=none" >> "$GITHUB_OUTPUT"
           fi
-      - name: Expand production source
-        if: steps.payload.outputs.present == 'true'
+      - name: Apply source package
+        if: steps.payload.outputs.mode != 'none'
         run: |
-          cat bootstrap/chunk_00 bootstrap/chunk_01 bootstrap/chunk_02 bootstrap/chunk_03 bootstrap/chunk_04 > /tmp/app.tar.gz.b64
-          base64 -d /tmp/app.tar.gz.b64 > /tmp/app.tar.gz
-          tar -xzf /tmp/app.tar.gz -C .
-          if [ -f bootstrap/typecheck-fixes.patch ]; then git apply bootstrap/typecheck-fixes.patch; fi
-          python3 bootstrap/remediate.py
-          rm -rf bootstrap
-          rm -f .github/workflows/ci.yml .github/workflows/scheduled-search.yml
+          if [ "${{ steps.payload.outputs.mode }}" = "final" ]; then
+            cat final/chunk_00 final/chunk_01 > /tmp/app.tar.gz.b64
+            base64 -d /tmp/app.tar.gz.b64 > /tmp/app.tar.gz
+            tar -xzf /tmp/app.tar.gz -C .
+            rm -rf final
+          else
+            cat bootstrap/chunk_00 bootstrap/chunk_01 bootstrap/chunk_02 bootstrap/chunk_03 bootstrap/chunk_04 > /tmp/app.tar.gz.b64
+            base64 -d /tmp/app.tar.gz.b64 > /tmp/app.tar.gz
+            tar -xzf /tmp/app.tar.gz -C .
+            if [ -f bootstrap/typecheck-fixes.patch ]; then git apply bootstrap/typecheck-fixes.patch; fi
+            python3 bootstrap/remediate.py
+            rm -rf bootstrap
+            rm -f .github/workflows/ci.yml .github/workflows/scheduled-search.yml
+          fi
       - uses: actions/setup-node@v4
-        if: steps.payload.outputs.present == 'true'
+        if: steps.payload.outputs.mode != 'none'
         with:
           node-version: 22
       - name: Install dependencies
-        if: steps.payload.outputs.present == 'true'
+        if: steps.payload.outputs.mode != 'none'
         run: npm install --no-audit --no-fund
       - name: Type check
-        if: steps.payload.outputs.present == 'true'
+        if: steps.payload.outputs.mode != 'none'
         run: npm run typecheck
       - name: Lint
-        if: steps.payload.outputs.present == 'true'
+        if: steps.payload.outputs.mode != 'none'
         run: npm run lint
       - name: Test
-        if: steps.payload.outputs.present == 'true'
+        if: steps.payload.outputs.mode != 'none'
         run: npm run test
       - name: Production build
-        if: steps.payload.outputs.present == 'true'
+        if: steps.payload.outputs.mode != 'none'
         run: npm run build
       - name: Commit validated source
-        if: steps.payload.outputs.present == 'true'
+        if: steps.payload.outputs.mode != 'none'
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git commit -m 'feat: build validated job search command center source'
+          git commit -m 'feat: finalize secure mobile job search command center'
           git push origin HEAD:feature/production-job-search-command-center
