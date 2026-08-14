@@ -1,7 +1,7 @@
 import 'server-only';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createDefaultState } from '../default-state';
+import { createDefaultState, defaultSettings } from '../default-state';
 import type { AppState } from '../types';
 import { findFileByName, googleConfigured, uploadBuffer, downloadFile } from './google';
 
@@ -14,10 +14,22 @@ function shouldUseLocalStorage(): boolean {
 
 export class StorageNotConfiguredError extends Error {}
 
+function normalizeState(state: AppState): AppState {
+  return {
+    ...state,
+    settings: {
+      ...defaultSettings,
+      ...(state.settings ?? {}),
+      targetCompanies: state.settings?.targetCompanies ?? defaultSettings.targetCompanies,
+    },
+    issues: state.issues ?? [],
+  };
+}
+
 async function readLocal(): Promise<AppState> {
   try {
     const raw = await fs.readFile(localPath, 'utf8');
-    return JSON.parse(raw) as AppState;
+    return normalizeState(JSON.parse(raw) as AppState);
   } catch {
     const state = createDefaultState();
     await fs.mkdir(path.dirname(localPath), { recursive: true });
@@ -41,7 +53,7 @@ async function readDrive(): Promise<AppState> {
     return initial;
   }
   const bytes = await downloadFile(existing.id);
-  return JSON.parse(bytes.toString('utf8')) as AppState;
+  return normalizeState(JSON.parse(bytes.toString('utf8')) as AppState);
 }
 
 async function writeDrive(state: AppState): Promise<void> {
