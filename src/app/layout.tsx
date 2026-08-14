@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, Playfair_Display } from 'next/font/google';
-// Vercel Analytics tracks page views across the app.
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import './ux.css';
