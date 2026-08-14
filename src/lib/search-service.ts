@@ -1,8 +1,7 @@
 import 'server-only';
 import { nanoid } from 'nanoid';
 import { discoverAll, verifyListing } from './job-sources';
-import { deterministicAnalysis, passesHardFilters } from './scoring';
-import { interpretAnalysis } from './ai';
+import { basicEligibility, evidenceBasedAnalysis, validateHighScore } from './ai/matching';
 import { getState, updateState } from './storage/state';
 import type { Analysis, Job, SearchRun } from './types';
 import { daysOld, fingerprint, normalizeText } from './utils';
@@ -10,12 +9,31 @@ import { notifySearchSummary } from './notifications';
 import { logAppIssue } from './issues';
 
 function semanticKey(job: Job) {
-  return `${normalizeText(job.company)}|${normalizeText(job.title)}|${normalizeText(job.location)}`;
+  return `${normalizeText(job.company)}|${normalizeText(job.title)}|${normalizeText(job.location)}|${normalizeText(job.requisitionNumber ?? '')}`;
+}
+
+function descriptionSimilarity(a: string, b: string): number {
+  const words = (value: string) => new Set(normalizeText(value).split(' ').filter(x => x.length > 4));
+  const aa = words(a);
+  const bb = words(b);
+  if (!aa.size || !bb.size) return 0;
+  let hits = 0;
+  for (const word of aa) if (bb.has(word)) hits++;
+  return hits / Math.min(aa.size, bb.size);
 }
 
 function chooseCanonical(a: Job, b: Job): Job {
-  const employerish = (j: Job) => /workday|greenhouse|lever|careers|jobs\./i.test(j.applicationUrl) ? 2 : /serpapi/i.test(j.source) ? 1 : 0;
-  return employerish(b) > employerish(a) ? b : a;
+  const employerish = (j: Job) => /workday|greenhouse|lever|careers|jobs\./i.test(j.applicationUrl) ? 3 : /serpapi|indeed|linkedin|ziprecruiter/i.test(j.source) ? 1 : 2;
+  if (employerish(b) !== employerish(a)) return employerish(b) > employerish(a) ? b : a;
+  const aLength = a.description?.length ?? 0;
+  const bLength = b.description?.length ?? 0;
+  return bLength > aLength ? b : a;
+}
+
+function qualifiesForDisplay(analysis: Analysis, fitThreshold: number, showStretchRoles: boolean): boolean {
+  if (analysis.disqualified) return false;
+  if (analysis.overallFitScore >= fitThreshold) return true;
+  return Boolean(showStretchRoles && analysis.overallFitScore >= 70);
 }
 
 export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRun> {
@@ -30,33 +48,58 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
   const candidateMap = new Map<string, Job>();
 
   for (const raw of discovered) {
-    if (daysOld(raw.datePosted) > state.settings.lookbackDays && raw.datePosted) { run.excluded++; continue; }
-    const job = { ...raw, duplicateFingerprint: raw.duplicateFingerprint || fingerprint([raw.company, raw.title, raw.location, raw.externalId]) };
+    const employerDate = raw.employerDatePosted || raw.datePosted;
+    if (daysOld(employerDate) > state.settings.lookbackDays && employerDate) { run.excluded++; continue; }
+    const job: Job = {
+      ...raw,
+      resultStatus: 'NEW',
+      duplicateFingerprint: raw.duplicateFingerprint || fingerprint([raw.company, raw.title, raw.location, raw.externalId, raw.requisitionNumber]),
+    };
+
     const existing = existingByFingerprint.get(job.duplicateFingerprint);
     if (existing) { run.duplicates++; continue; }
-    const semanticExisting = existingBySemantic.get(semanticKey(job));
-    if (semanticExisting && semanticExisting.active) { run.duplicates++; continue; }
-    if (semanticExisting && !semanticExisting.active && semanticExisting.externalId !== job.externalId) job.repost = true;
-    const key = semanticKey(job);
-    const current = candidateMap.get(key);
-    if (current) { candidateMap.set(key, chooseCanonical(current, job)); run.duplicates++; }
-    else candidateMap.set(key, job);
-  }
 
-  const hardFiltered: Job[] = [];
-  for (const job of candidateMap.values()) {
-    const hard = passesHardFilters(job, state.settings.salaryFloor, state.settings.radiusMiles);
-    const nonActiveReasons = hard.reasons.filter(r => r !== 'Listing is inactive');
-    if (nonActiveReasons.length) { run.excluded++; continue; }
-    hardFiltered.push(job);
+    const semanticExisting = existingBySemantic.get(semanticKey(job));
+    if (semanticExisting && semanticExisting.active) {
+      const changed = descriptionSimilarity(semanticExisting.description, job.description) < 0.82;
+      if (!changed) { run.duplicates++; continue; }
+      job.resultStatus = 'UPDATED';
+    }
+    if (semanticExisting && !semanticExisting.active && semanticExisting.externalId !== job.externalId) {
+      job.repost = true;
+      job.resultStatus = 'UPDATED';
+    }
+
+    let key = semanticKey(job);
+    const current = candidateMap.get(key);
+    if (current) {
+      candidateMap.set(key, chooseCanonical(current, job));
+      run.duplicates++;
+      continue;
+    }
+
+    const nearDuplicate = [...candidateMap.entries()].find(([, candidate]) =>
+      normalizeText(candidate.company) === normalizeText(job.company) &&
+      normalizeText(candidate.title) === normalizeText(job.title) &&
+      descriptionSimilarity(candidate.description, job.description) >= 0.88
+    );
+    if (nearDuplicate) {
+      candidateMap.set(nearDuplicate[0], chooseCanonical(nearDuplicate[1], job));
+      run.duplicates++;
+      continue;
+    }
+    candidateMap.set(key, job);
   }
 
   const verified: Job[] = [];
   const batchSize = 6;
-  for (let i = 0; i < hardFiltered.length; i += batchSize) {
-    const batch = await Promise.all(hardFiltered.slice(i, i + batchSize).map(verifyListing));
+  const candidates = [...candidateMap.values()];
+  for (let i = 0; i < candidates.length; i += batchSize) {
+    const batch = await Promise.all(candidates.slice(i, i + batchSize).map(verifyListing));
     for (const job of batch) {
-      if (job.verificationStatus === 'INACTIVE') { run.inactive++; continue; }
+      if (job.verificationStatus === 'INACTIVE' || !job.active) { run.inactive++; continue; }
+      const eligibility = basicEligibility(job, state.settings);
+      if (!eligibility.pass) { run.excluded++; continue; }
       verified.push(job);
     }
   }
@@ -64,13 +107,17 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
   const analyses: Analysis[] = [];
   if (state.careerProfile) {
     for (const job of verified) {
-      let analysis = deterministicAnalysis(job, state.careerProfile);
-      if (analysis.overallFitScore >= state.settings.fitThreshold) {
-        try { analysis = await interpretAnalysis(job, state.careerProfile, analysis); }
-        catch (error) { run.errors.push(`AI review ${job.company}/${job.title}: ${error instanceof Error ? error.message : 'failed'}`); }
-        analyses.push(analysis);
-        run.qualified++;
-      } else {
+      try {
+        let analysis = await evidenceBasedAnalysis(job, state.careerProfile, state.settings);
+        analysis = await validateHighScore(job, state.careerProfile, analysis);
+        if (qualifiesForDisplay(analysis, state.settings.fitThreshold, Boolean(state.settings.showStretchRoles))) {
+          analyses.push(analysis);
+          run.qualified++;
+        } else {
+          run.excluded++;
+        }
+      } catch (error) {
+        run.errors.push(`Evidence review ${job.company}/${job.title}: ${error instanceof Error ? error.message : 'failed'}`);
         run.excluded++;
       }
     }
@@ -80,7 +127,9 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
 
   run.completedAt = new Date().toISOString();
   await updateState(current => {
-    current.jobs.push(...verified);
+    const existingJobs = new Map(current.jobs.map(j => [j.id, j]));
+    for (const job of verified) existingJobs.set(job.id, job);
+    current.jobs = [...existingJobs.values()];
     current.analyses.push(...analyses);
     current.searchRuns.unshift(run);
     current.searchRuns = current.searchRuns.slice(0, 100);
@@ -100,7 +149,13 @@ export async function runSearch(trigger: SearchRun['trigger']): Promise<SearchRu
 
   if (state.notificationsEnabled !== false) {
     try {
-      const qualifiedJobs = verified.filter(j => analyses.some(a => a.jobId === j.id)).sort((a,b) => (analyses.find(x=>x.jobId===b.id)?.overallFitScore ?? 0) - (analyses.find(x=>x.jobId===a.id)?.overallFitScore ?? 0));
+      const qualifiedJobs = verified
+        .filter(j => analyses.some(a => a.jobId === j.id))
+        .sort((a,b) => {
+          const aa = analyses.find(x=>x.jobId===a.id);
+          const bb = analyses.find(x=>x.jobId===b.id);
+          return (bb?.priorityScore ?? 0) - (aa?.priorityScore ?? 0) || (bb?.overallFitScore ?? 0) - (aa?.overallFitScore ?? 0);
+        });
       await notifySearchSummary(run, qualifiedJobs);
     } catch (error) {
       console.warn('Search notification failed', error instanceof Error ? error.message : error);
