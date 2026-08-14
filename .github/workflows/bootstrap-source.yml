@@ -29,6 +29,7 @@ jobs:
           tar -xzf /tmp/app.tar.gz -C .
           if [ -f bootstrap/typecheck-fixes.patch ]; then git apply bootstrap/typecheck-fixes.patch; fi
           if [ -f bootstrap/lint-mobile-fixes.patch ]; then git apply bootstrap/lint-mobile-fixes.patch; fi
+          if [ -f bootstrap/mobile-ui-polish.patch ]; then git apply bootstrap/mobile-ui-polish.patch; fi
           rm -rf bootstrap
       - uses: actions/setup-node@v4
         if: steps.payload.outputs.present == 'true'
