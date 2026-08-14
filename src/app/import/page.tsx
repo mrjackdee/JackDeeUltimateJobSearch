@@ -1,0 +1,2 @@
+import { ImportForm } from '@/components/ImportForm';
+export default function ImportPage() { return <><section className="hero"><div className="eyebrow">Manual job import</div><h1>Bring any role into the same scoring workflow.</h1><p>Paste a direct employer URL or the posting details. The app verifies the listing, applies hard filters, runs fit analysis, and makes it available for application preparation.</p></section><ImportForm/></>; }

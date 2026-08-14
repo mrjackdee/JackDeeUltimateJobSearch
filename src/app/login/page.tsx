@@ -1,0 +1,2 @@
+import { LoginForm } from '@/components/LoginForm';
+export default function LoginPage(){return <div className="login-wrap"><div className="login-card"><div className="brand"><span className="brand-mark">JD</span><span>Job Search Command Center</span></div><div><h1 style={{fontSize:32}}>Private career workspace</h1><p>Job history, resumes, application packages, and Google Drive links are protected by single-user Google authentication.</p></div><LoginForm/></div></div>}
