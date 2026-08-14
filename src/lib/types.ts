@@ -18,6 +18,19 @@ export type ApplicationStatus =
   | 'CLOSED'
   | 'ARCHIVED';
 
+export interface AppIssue {
+  id: string;
+  occurredAt: string;
+  area: string;
+  action?: string;
+  severity: 'INFO' | 'WARNING' | 'ERROR';
+  userMessage: string;
+  technicalMessage?: string;
+  route?: string;
+  statusCode?: number;
+  resolved?: boolean;
+}
+
 export interface Job {
   id: string;
   externalId?: string;
@@ -190,7 +203,6 @@ export interface MasterResume {
   isBaseline?: boolean;
 }
 
-
 export interface SearchRun {
   id: string;
   startedAt: string;
@@ -227,6 +239,7 @@ export interface AppState {
   settings: SearchSettings;
   baselineResumeId?: string;
   notificationsEnabled?: boolean;
+  issues?: AppIssue[];
   updatedAt: string;
 }
 
