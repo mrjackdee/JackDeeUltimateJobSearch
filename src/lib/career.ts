@@ -1,10 +1,14 @@
 import 'server-only';
 import mammoth from 'mammoth';
+import pdf from 'pdf-parse';
 import { buildCareerEvidenceProfile } from './ai';
-import { listFolder, downloadFile, findFileByName } from './storage/google';
+import { listFolder, downloadFile, findFileByName, getFileMetadata } from './storage/google';
 import { updateState } from './storage/state';
 import type { MasterResume } from './types';
 
+const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const PDF_MIME = 'application/pdf';
+const GOOGLE_DOC_MIME = 'application/vnd.google-apps.document';
 
 async function masterFolderId(): Promise<string> {
   if (process.env.GOOGLE_MASTER_FOLDER_ID) return process.env.GOOGLE_MASTER_FOLDER_ID;
@@ -27,15 +31,27 @@ function masterId(name: string): string | undefined {
 }
 
 export async function extractResumeText(fileId: string): Promise<string> {
+  const meta = await getFileMetadata(fileId);
+  const mime = meta.mimeType ?? '';
   const bytes = await downloadFile(fileId);
-  const result = await mammoth.extractRawText({ buffer: bytes });
-  return result.value.replace(/\n{3,}/g, '\n\n').trim();
+
+  if (mime === PDF_MIME) {
+    const result = await pdf(bytes);
+    return result.text.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  if (mime === DOCX_MIME || mime === GOOGLE_DOC_MIME) {
+    const result = await mammoth.extractRawText({ buffer: bytes });
+    return result.value.replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  throw new Error(`Unsupported resume format: ${mime || 'unknown'}.`);
 }
 
 export async function syncCareerProfile() {
   const folder = await masterFolderId();
   const files = await listFolder(folder);
-  const usable = files.filter(f => f.id && f.name && (f.mimeType === 'application/vnd.google-apps.document' || f.mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'));
+  const usable = files.filter(f => f.id && f.name && [GOOGLE_DOC_MIME, DOCX_MIME, PDF_MIME].includes(f.mimeType ?? ''));
   if (!usable.length) throw new Error('No readable master resume documents are available in the Google Drive master folder.');
 
   const sources: Array<{ id: string; name: string; text: string }> = [];
@@ -77,7 +93,7 @@ export async function getMasterResumeText(masterName: string): Promise<{ id: str
     ?? files.find(f => f.id && f.name && normalized.includes('scrum') && /scrum|agile/i.test(f.name))
     ?? files.find(f => f.id && f.name && normalized.includes('product') && /product owner/i.test(f.name))
     ?? files.find(f => f.id && f.name && normalized.includes('project manager') && /project manager/i.test(f.name))
-    ?? files.find(f => f.id && f.name);
+    ?? files.find(f => f.id && f.name && [GOOGLE_DOC_MIME, DOCX_MIME, PDF_MIME].includes(f.mimeType ?? ''));
   if (!preferred?.id || !preferred.name) throw new Error('No master resume is available.');
   return { id: preferred.id, name: preferred.name, text: await extractResumeText(preferred.id) };
 }
