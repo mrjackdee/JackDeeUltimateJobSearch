@@ -7,7 +7,7 @@ export async function proxy(request: NextRequest) {
   if (process.env.NODE_ENV !== 'production' && !process.env.APP_SESSION_SECRET) return NextResponse.next();
   const valid = await validSessionToken(request.cookies.get('jd_session')?.value, process.env.APP_SESSION_SECRET);
   if (valid) return NextResponse.next();
-  if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (pathname.startsWith('/api/')) return NextResponse.json({ error: 'Your sign-in session has ended. Sign in again, then retry this action.' }, { status: 401 });
   const url = request.nextUrl.clone();
   url.pathname = '/login';
   return NextResponse.redirect(url);
