@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BriefcaseBusiness, ClipboardCheck, FilePlus2, Settings } from 'lucide-react';
+import { BriefcaseBusiness, ClipboardCheck, ListChecks, Settings } from 'lucide-react';
 
 export function Nav() {
   const pathname = usePathname();
   const items = [
-    { href: '/', label: 'Rundown', icon: BriefcaseBusiness },
+    { href: '/', label: 'Home', icon: BriefcaseBusiness },
+    { href: '/guide', label: 'Workflow', icon: ListChecks },
     { href: '/applications', label: 'Applications', icon: ClipboardCheck },
-    { href: '/import', label: 'Import', icon: FilePlus2 },
     { href: '/settings', label: 'Settings', icon: Settings },
   ];
 
