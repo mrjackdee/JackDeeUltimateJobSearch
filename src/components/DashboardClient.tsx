@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useMemo, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpRight, BriefcaseBusiness, FolderOpen, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowUpRight, FolderOpen, Sparkles } from 'lucide-react';
+import HeroSection from '@/components/HeroSection';
 import type { Analysis, Application, ApplicationPackage, Job, SearchLane, SearchRun, SearchSettings } from '@/lib/types';
 import { salaryText } from '@/lib/utils';
 
@@ -23,10 +24,16 @@ function fitCopy(row: Row) {
 export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile }: { rows: Row[]; searchRuns: SearchRun[]; settings: SearchSettings; hasCareerProfile: boolean }) {
   const [lane, setLane] = useState<'ALL' | SearchLane>('ALL');
   const [query, setQuery] = useState('');
+  const [locationQuery, setLocationQuery] = useState('');
   const [message, setMessage] = useState('');
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
-  const visible = useMemo(() => rows.filter(r => (lane === 'ALL' || r.job.searchLane === lane) && normalize(`${r.job.title} ${r.job.company} ${r.job.location}`).includes(normalize(query))), [rows, lane, query]);
+  const visible = useMemo(() => rows.filter(r => {
+    const laneMatches = lane === 'ALL' || r.job.searchLane === lane;
+    const roleMatches = !normalize(query) || normalize(`${r.job.title} ${r.job.company}`).includes(normalize(query));
+    const locationMatches = !normalize(locationQuery) || normalize(`${r.job.location} ${r.job.workArrangement}`).includes(normalize(locationQuery));
+    return laneMatches && roleMatches && locationMatches;
+  }), [rows, lane, query, locationQuery]);
   const today = new Date().toISOString().slice(0,10);
   const newToday = rows.filter(r => r.job.dateDiscovered.startsWith(today)).length;
   const applyNow = rows.filter(r => r.analysis?.priorityRecommendation === 'APPLY_NOW').length;
@@ -37,7 +44,6 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile }
   const phases = [
     ['DISCOVERED','Discovered'],['REVIEWING','Review'],['PREPARING','Preparing'],['READY_TO_APPLY','Ready'],['APPLIED','Applied'],['RECRUITER_CONTACT','Recruiter'],['INTERVIEW','Interview'],['FINAL_INTERVIEW','Final'],['OFFER','Offer'],['CLOSED','Closed']
   ] as const;
-
 
   async function runSearch() {
     setMessage('');
@@ -62,17 +68,17 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile }
   }
 
   return <>
-    <section className="hero">
-      <div className="eyebrow">Daily Job Rundown</div>
-      <h1>Know what deserves your attention today.</h1>
-      <p>Fresh opportunities are ranked by fit, ATS alignment, recency, compensation, work arrangement, and career strategy. Morning search runs at 7:00 AM Eastern and refreshes at 4:00 PM Eastern.</p>
-      <div className="hero-actions">
-        <button className="button primary" onClick={runSearch} disabled={isPending}><RefreshCw size={16}/>{isPending ? 'Working…' : 'Run Job Search Now'}</button>
-        <Link className="button" href="/import"><BriefcaseBusiness size={16}/>Import a Job</Link>
-      </div>
-      {!hasCareerProfile && <div className="notice">Career Evidence Profile is not synced yet. Go to Settings and run Career Profile Sync before relying on fit and ATS scores.</div>}
-      {message && <div className={message.toLowerCase().includes('failed') ? 'notice error' : 'notice'}>{message}</div>}
-    </section>
+    <HeroSection
+      roleQuery={query}
+      locationQuery={locationQuery}
+      onRoleQueryChange={setQuery}
+      onLocationQueryChange={setLocationQuery}
+      onSearch={runSearch}
+      isPending={isPending}
+    />
+
+    {!hasCareerProfile && <div className="notice">Career Evidence Profile is not synced yet. Go to Settings and run Career Profile Sync before relying on fit and ATS scores.</div>}
+    {message && <div className={message.toLowerCase().includes('failed') ? 'notice error' : 'notice'}>{message}</div>}
 
     <section className="stats" aria-label="Daily summary">
       <div className="stat"><div className="stat-value">{newToday}</div><div className="stat-label">Today&apos;s new jobs</div></div>
@@ -89,7 +95,6 @@ export function DashboardClient({ rows, searchRuns, settings, hasCareerProfile }
     </section>
 
     <section className="toolbar" aria-label="Job filters">
-      <input className="search-input" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search company, role, or location" aria-label="Search opportunities"/>
       <div className="filters">
         {(['ALL','EXECUTIVE','PROGRAM_PROJECT','AGILE','PRODUCT'] as const).map(value => <button key={value} className={`filter ${lane === value ? 'active' : ''}`} onClick={() => setLane(value)}>{value === 'ALL' ? 'All opportunities' : laneLabels[value]}</button>)}
       </div>
