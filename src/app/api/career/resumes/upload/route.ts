@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import { copyFileToFolder, findFileByName, getFileMetadata, uploadBuffer } from '@/lib/storage/google';
 import { updateState } from '@/lib/storage/state';
 import { syncCareerProfile } from '@/lib/career';
-import { logAppIssue } from '@/lib/issues';
+import { logAppIssue, plainUserError } from '@/lib/issues';
 import type { SearchLane } from '@/lib/types';
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -47,7 +47,9 @@ export async function POST(request: NextRequest) {
     let stored: { id: string; url: string };
 
     if (googleDocId) {
-      const meta = await getFileMetadata(googleDocId);
+      let meta;
+      try { meta = await getFileMetadata(googleDocId); }
+      catch { return NextResponse.json({ error: 'The app could not open that Google Doc. Make sure the same Google account can open it, then copy the full document link and try again.' }, { status: 400 }); }
       if (meta.mimeType !== GOOGLE_DOC_MIME) return NextResponse.json({ error: 'That link is not a Google Doc. Open the resume in Google Docs and paste that document link instead.' }, { status: 400 });
       const cleanName = name.replace(/[^a-z0-9 _-]/gi, '').trim() || 'Updated Master Resume';
       stored = await copyFileToFolder({ fileId: googleDocId, name: `${cleanName}_${new Date().toISOString().slice(0,10)}`, parentId: folder });
@@ -75,9 +77,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, id, url: stored.url });
   } catch (error) {
     console.error('Resume update failed', error);
-    const message = error instanceof Error && !/GOOGLE_|OAuth|API|mime|token|credential/i.test(error.message)
-      ? error.message
-      : 'The resume could not be saved right now. Please try again. If this keeps happening, confirm that Google Drive is connected in Settings.';
+    const message = plainUserError('The resume could not be saved right now. Please try again. If this keeps happening, check the Google Drive connection in Settings.', error);
     await logAppIssue({ area: 'Resume setup', action: 'Add or change the baseline resume', severity: 'ERROR', userMessage: message, technicalMessage: error instanceof Error ? error.stack ?? error.message : String(error), route: '/api/career/resumes/upload', statusCode: 500, resolved: false });
     return NextResponse.json({ error: message }, { status: 500 });
   }
