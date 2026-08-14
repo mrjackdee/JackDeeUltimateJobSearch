@@ -12,19 +12,19 @@ export function ImportForm() {
       const payload = Object.fromEntries([...formData.entries()].filter(([,v]) => String(v).trim()));
       const res = await fetch('/api/import', { method: 'POST', headers: { 'content-type':'application/json' }, body: JSON.stringify(payload) });
       const data = await res.json();
-      if (!res.ok) setResult(data.error ?? 'Import failed.');
-      else if (data.excluded) setResult(`Imported for review but excluded from the primary queue: ${data.reasons.join(' ')}`);
-      else { setResult(`Imported and analyzed. Fit score: ${data.analysis?.overallFitScore ?? 'pending'}.`); router.refresh(); }
+      if (!res.ok) setResult(data.error ?? 'The job could not be added. Please check the information and try again.');
+      else if (data.excluded) setResult(`The job was saved for reference, but it does not meet your current search preferences. ${data.reasons.join(' ')}`);
+      else { setResult(`The job was added and reviewed. Match score: ${data.analysis?.overallFitScore ?? 'still being calculated'}.`); router.refresh(); }
     });
   }
   return <form className="form" action={submit}>
-    <div className="field"><label htmlFor="url">Job posting URL</label><input id="url" name="url" type="url" required placeholder="https://company.com/careers/job/..."/></div>
-    <div className="notice">The app will try to extract structured JobPosting data from the URL. If the page blocks automated access, paste the description and the missing fields below.</div>
-    <div className="field"><label htmlFor="title">Job title (optional if detectable)</label><input id="title" name="title"/></div>
-    <div className="field"><label htmlFor="company">Company (optional if detectable)</label><input id="company" name="company"/></div>
-    <div className="field"><label htmlFor="location">Location (optional if detectable)</label><input id="location" name="location" placeholder="Atlanta, GA / Dallas, TX / Remote"/></div>
-    <div className="field"><label htmlFor="description">Full job description (optional if detectable)</label><textarea id="description" name="description"/></div>
-    <button className="button primary" disabled={pending}>{pending ? 'Analyzing…' : 'Import and Analyze'}</button>
-    {result && <div className={result.toLowerCase().includes('failed') || result.toLowerCase().includes('excluded') ? 'notice error' : 'notice'}>{result}</div>}
+    <div className="field"><label htmlFor="url">Job posting link</label><input id="url" name="url" type="url" required placeholder="https://company.com/careers/job/..."/></div>
+    <div className="notice">Start with the job link. The app will try to fill in the details automatically. If the employer's site does not allow that, copy the missing information into the fields below.</div>
+    <div className="field"><label htmlFor="title">Job title</label><input id="title" name="title" placeholder="Only needed if the app cannot read it from the link"/></div>
+    <div className="field"><label htmlFor="company">Company</label><input id="company" name="company" placeholder="Only needed if the app cannot read it from the link"/></div>
+    <div className="field"><label htmlFor="location">Location</label><input id="location" name="location" placeholder="Atlanta, GA / Dallas, TX / Remote"/></div>
+    <div className="field"><label htmlFor="description">Job description</label><textarea id="description" name="description" placeholder="Paste the full job description here if the app cannot read it from the link"/></div>
+    <button className="button primary" disabled={pending}>{pending ? 'Reviewing job…' : 'Add and review job'}</button>
+    {result && <div className={result.toLowerCase().includes('could not') || result.toLowerCase().includes('does not meet') ? 'notice error' : 'notice'}>{result}</div>}
   </form>;
 }
