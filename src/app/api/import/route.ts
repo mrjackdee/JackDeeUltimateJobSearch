@@ -4,8 +4,8 @@ import { nanoid } from 'nanoid';
 import { fingerprint, parseSalary } from '@/lib/utils';
 import type { Job, SearchLane, WorkArrangement } from '@/lib/types';
 import { verifyListing } from '@/lib/job-sources';
-import { deterministicAnalysis, passesHardFilters } from '@/lib/scoring';
-import { interpretAnalysis } from '@/lib/ai';
+import { basicEligibility, evidenceBasedAnalysis, validateHighScore } from '@/lib/ai/matching';
+import { specializedDomainMismatch } from '@/lib/domain-guard';
 import { getState, updateState } from '@/lib/storage/state';
 import { logAppIssue, plainUserError } from '@/lib/issues';
 
@@ -49,6 +49,7 @@ function parseJobPosting(html: string, url: string): Partial<Job> {
     applicationUrl: url,
     sourceUrl: url,
     description,
+    descriptionCompleteness: description.length >= 3000 ? 'FULL' : description.length >= 1200 ? 'MOSTLY_COMPLETE' : 'PARTIAL',
     location: location || (arrangement(description) === 'REMOTE' ? 'Remote' : 'Unknown'),
     workArrangement: arrangement(`${location} ${description}`),
     employmentType: /full/.test(emp) || /full[- ]?time/.test(description.toLowerCase()) ? 'FULL_TIME' : /contract/.test(emp) ? 'CONTRACT' : 'UNKNOWN',
@@ -56,7 +57,9 @@ function parseJobPosting(html: string, url: string): Partial<Job> {
     salaryMax: salary.max,
     salaryCurrency: salary.min || salary.max ? 'USD' : undefined,
     datePosted: data?.datePosted ? String(data.datePosted) : undefined,
+    employerDatePosted: data?.datePosted ? String(data.datePosted) : undefined,
     externalId: data?.identifier?.value ? String(data.identifier.value) : undefined,
+    requisitionNumber: data?.identifier?.value ? String(data.identifier.value) : undefined,
   };
 }
 
@@ -75,26 +78,36 @@ export async function POST(request: NextRequest) {
     if (!partial.title || !partial.company || !partial.description || !partial.applicationUrl) throw new Error('The app still needs the job title, company, job description, and employer link. Add the missing details and try again.');
     const job: Job = {
       id: nanoid(), title: partial.title, company: partial.company, applicationUrl: partial.applicationUrl,
-      sourceUrl: partial.sourceUrl ?? partial.applicationUrl, description: partial.description, location: partial.location ?? 'Unknown',
+      sourceUrl: partial.sourceUrl ?? partial.applicationUrl, description: partial.description,
+      descriptionCompleteness: partial.descriptionCompleteness ?? (partial.description.length >= 3000 ? 'FULL' : partial.description.length >= 1200 ? 'MOSTLY_COMPLETE' : 'PARTIAL'),
+      location: partial.location ?? 'Unknown',
       workArrangement: partial.workArrangement ?? arrangement(`${partial.location ?? ''} ${partial.description}`),
       employmentType: partial.employmentType ?? 'UNKNOWN', salaryMin: partial.salaryMin, salaryMax: partial.salaryMax, salaryCurrency: partial.salaryCurrency,
-      datePosted: partial.datePosted, dateDiscovered: new Date().toISOString(), externalId: partial.externalId, source,
-      searchLane: lane(partial.title), verificationStatus: 'STATUS_UNCERTAIN', repost: false,
-      duplicateFingerprint: fingerprint([partial.company, partial.title, partial.location, partial.externalId, partial.applicationUrl]), active: true,
+      datePosted: partial.datePosted, employerDatePosted: partial.employerDatePosted, dateDiscovered: new Date().toISOString(), externalId: partial.externalId,
+      requisitionNumber: partial.requisitionNumber, source,
+      searchLane: lane(partial.title), verificationStatus: 'STATUS_UNCERTAIN', repost: false, resultStatus: 'NEW',
+      duplicateFingerprint: fingerprint([partial.company, partial.title, partial.location, partial.externalId, partial.requisitionNumber, partial.applicationUrl]), active: true,
     };
     const verified = await verifyListing(job);
     const state = await getState();
-    const hard = passesHardFilters(verified, state.settings.salaryFloor, state.settings.radiusMiles);
-    if (!hard.pass) return NextResponse.json({ job: verified, excluded: true, reasons: hard.reasons });
-    let analysis = state.careerProfile ? deterministicAnalysis(verified, state.careerProfile) : undefined;
-    if (analysis && analysis.overallFitScore >= state.settings.fitThreshold) {
-      try { analysis = await interpretAnalysis(verified, state.careerProfile!, analysis); } catch { /* keep the basic match review */ }
-    }
+    const eligibility = basicEligibility(verified, state.settings);
+    if (!eligibility.pass) return NextResponse.json({ job: verified, excluded: true, reasons: eligibility.reasons });
+    if (!state.careerProfile) return NextResponse.json({ job: verified, excluded: true, reasons: ['Your Career Profile needs to be refreshed before this job can be scored.'] });
+
+    const domainGuard = specializedDomainMismatch(verified, state.careerProfile);
+    if (domainGuard.mismatch) return NextResponse.json({ job: verified, excluded: true, reasons: domainGuard.reasons });
+
+    let analysis = await evidenceBasedAnalysis(verified, state.careerProfile, state.settings);
+    analysis = await validateHighScore(verified, state.careerProfile, analysis);
+    const qualifies = !analysis.disqualified && (analysis.overallFitScore >= state.settings.fitThreshold || (state.settings.showStretchRoles && analysis.overallFitScore >= 70));
+
     await updateState(current => {
       if (!current.jobs.some(j => j.duplicateFingerprint === verified.duplicateFingerprint)) current.jobs.push(verified);
-      if (analysis) current.analyses.push(analysis);
-      current.searchRuns.unshift({ id: nanoid(), startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), trigger: 'IMPORT', discovered: 1, qualified: analysis?.overallFitScore && analysis.overallFitScore >= current.settings.fitThreshold ? 1 : 0, excluded: 0, inactive: 0, duplicates: 0, errors: [] });
+      current.analyses.push(analysis);
+      current.searchRuns.unshift({ id: nanoid(), startedAt: new Date().toISOString(), completedAt: new Date().toISOString(), trigger: 'IMPORT', discovered: 1, qualified: qualifies ? 1 : 0, excluded: qualifies ? 0 : 1, inactive: 0, duplicates: 0, errors: [] });
     });
+
+    if (!qualifies) return NextResponse.json({ job: verified, analysis, excluded: true, reasons: analysis.disqualificationReasons?.length ? analysis.disqualificationReasons : analysis.gaps });
     return NextResponse.json({ job: verified, analysis });
   } catch (error) {
     const userMessage = plainUserError('The job could not be added right now. Check the employer link and any information you entered, then try again.', error);
