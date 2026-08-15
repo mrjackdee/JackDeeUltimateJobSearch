@@ -1,10 +1,11 @@
 import { SupportTicketClient } from '@/components/SupportTicketClient';
 import { listSupportTickets, supportDatabaseConfigured } from '@/lib/support';
+import type { SupportTicket } from '@/lib/support-types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SupportPage() {
-  let tickets = [];
+  let tickets: SupportTicket[] = [];
   try {
     tickets = await listSupportTickets();
   } catch {
