@@ -4,30 +4,18 @@ import { google } from 'googleapis';
 import { customAlphabet } from 'nanoid';
 import { z } from 'zod';
 import { driveClient, googleAuth } from './storage/google';
+import { supportCategories, supportPriorities, type SupportTicket, type SupportTicketInput } from './support-types';
 
 const ticketSuffix = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
 
 export const supportTicketInputSchema = z.object({
-  category: z.enum(['APP_ISSUE', 'LOGIN_ACCESS', 'JOB_SEARCH', 'MATCHING_SCORING', 'RESUME_DOCUMENTS', 'APPLICATION_TRACKING', 'GOOGLE_DRIVE', 'OTHER']),
-  priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']),
+  category: z.enum(supportCategories),
+  priority: z.enum(supportPriorities),
   subject: z.string().trim().min(5).max(140),
   description: z.string().trim().min(20).max(5000),
   pageUrl: z.string().trim().max(1000).optional().default(''),
   deviceInfo: z.string().trim().max(1000).optional().default(''),
 });
-
-export type SupportTicketInput = z.infer<typeof supportTicketInputSchema>;
-
-export type SupportTicket = SupportTicketInput & {
-  ticketNumber: string;
-  createdAt: string;
-  updatedAt: string;
-  status: 'OPEN' | 'IN_PROGRESS' | 'WAITING' | 'RESOLVED' | 'CLOSED';
-  userEmail: string;
-  driveFileId?: string;
-  driveFileUrl?: string;
-  archiveSyncStatus: 'PENDING' | 'COMPLETE' | 'FAILED';
-};
 
 function supabaseConfigured() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
@@ -228,8 +216,7 @@ export async function createSupportTicket(input: SupportTicketInput, userEmail: 
 
 export async function listSupportTickets(): Promise<SupportTicket[]> {
   if (!supabaseConfigured()) return [];
-  const query = 'support_tickets?select=*&order=created_at.desc&limit=100';
-  const response = await fetch(supabaseEndpoint(query), {
+  const response = await fetch(supabaseEndpoint('support_tickets?select=*&order=created_at.desc&limit=100'), {
     headers: supabaseHeaders(),
     cache: 'no-store',
   });
