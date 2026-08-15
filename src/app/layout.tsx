@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import './ux.css';
+import './support.css';
 import { Header } from '@/components/Header';
 import { Nav } from '@/components/Nav';
 
